@@ -62,7 +62,7 @@ O aplicativo continua abrindo por `file://` (sem service worker). Para instalar 
 
 1. Abra esta pasta no VS Code e escolha **Live Server → Open with Live Server**, ou execute `npx serve .` no terminal (o segundo comando exige Node/npm e pode baixar o pacote `serve`, mas **não é uma dependência do AdmPro**).
 2. Acesse o endereço local informado pelo servidor (por exemplo, `http://localhost:5500/index.html`).
-3. Abra uma vez com conexão de rede disponível. Confirme em DevTools → Application → Service Workers que `sw.js` está ativo. Em Application → Cache Storage, confira `admpro-estaticos-v3-1`.
+3. Abra uma vez com conexão de rede disponível. Confirme em DevTools → Application → Service Workers que `sw.js` está ativo. Em Application → Cache Storage, confira `admpro-estaticos-v3-2`.
 4. Vá a Configurações → Instalação e escolha **Instalar app**, se disponível. No Safari do iPhone use **Compartilhar → Adicionar à Tela de Início**.
 5. Em DevTools → Network, ative **Offline** e recarregue: os arquivos estáticos devem permanecer disponíveis. Os dados continuam exclusivamente neste navegador.
 6. Ao atualizar o projeto, altere o valor de `CACHE` em `sw.js` para forçar o navegador a preparar a nova versão. A confirmação **Atualizar** ativa a versão que está aguardando.
@@ -83,3 +83,14 @@ O aplicativo continua abrindo por `file://` (sem service worker). Para instalar 
 10. **Modelos:** selecione cada modelo no onboarding; em Configurações altere o modelo e confirme que os dados existentes permanecem iguais. Teste a nomenclatura de assistência técnica.
 
 Para investigar limitações específicas de navegadores móveis, valide também nas larguras de 360, 390, 768 e 1280px, em temas claro e escuro.
+### Regressão automatizada opcional
+
+Para executar os testes de regras com Node.js 18+ (somente módulos nativos, sem `npm install` e sem etapa de build):
+
+```bash
+node --test tests/regressao.js
+```
+
+Os testes verificam migração v2→v3, retenção de dados diante de JSON inválido, importação de backup, recorrência, controle de estoque, recebimentos, despesas fixas e valores monetários. `tests/` não faz parte dos scripts carregados pelo `index.html` e não é necessário para usar o aplicativo.
+
+Na migração, `storage.js` verifica se há coleções corrompidas antes de gravar e só marca a nova versão depois de converter os dados. Se encontrar um JSON inválido, a migração é adiada e o conteúdo original é preservado para possível recuperação por backup. Evite criar novos cadastros antes de restaurar o armazenamento corrompido.

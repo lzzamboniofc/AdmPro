@@ -59,14 +59,26 @@
     function migrarDados() {
         const c = obter('config');
         if (!c || (c.versaoDados || 1) >= VERSAO_DADOS) return;
-        // Migração aditiva: nunca altera ID nem apaga campos desconhecidos.
-        gravar('config', { metaMensal:0, modeloNegocio:'outro', reciboSequencia:0, ...c, versaoDados:VERSAO_DADOS });
-        gravar('catalogo', lista('catalogo').map(item => ({ controlaEstoque:false, qtdEstoque:0, estoqueMinimo:0, unidade:'un', ...item })));
-        gravar('servicos', lista('servicos').map(s => ({ profissionalId:null, recorrencia:{ ativa:false, intervalo:1, unidade:'meses' }, origemRecorrenciaId:null, proximoGeradoId:null, estoqueBaixado:false, lembreteEnviadoEm:null, ...s })));
-        gravar('lancamentos', lista('lancamentos').map(l => ({ despesaFixaId:null, competencia:l.data?.slice(0,7) || '', ...l })));
-        for (const col of ['profissionais','despesasFixas','movimentacoesEstoque']) {
+        // Validar todas as coleções antes de gravar evita sobrescrever um JSON
+        // corrompido com uma lista vazia. O usuário poderá recuperar o backup.
+        const catalogo = lista('catalogo');
+        const servicos = lista('servicos');
+        const lancamentos = lista('lancamentos');
+        const extras = ['profissionais','despesasFixas','movimentacoesEstoque'];
+        extras.forEach(lista);
+        if (problemas.size) {
+            console.warn('AdmPro: migração adiada; existe armazenamento inválido. Restaure um backup antes de continuar.');
+            return;
+        }
+        // Migração aditiva: preserva IDs e campos desconhecidos e só marca
+        // versaoDados=3 depois das demais escritas, permitindo uma retomada.
+        gravar('catalogo', catalogo.map(item => ({ controlaEstoque:false, qtdEstoque:0, estoqueMinimo:0, unidade:'un', ...item })));
+        gravar('servicos', servicos.map(s => ({ profissionalId:null, recorrencia:{ ativa:false, intervalo:1, unidade:'meses' }, origemRecorrenciaId:null, proximoGeradoId:null, estoqueBaixado:false, lembreteEnviadoEm:null, ...s })));
+        gravar('lancamentos', lancamentos.map(l => ({ despesaFixaId:null, competencia:l.data?.slice(0,7) || '', ...l })));
+        for (const col of extras) {
             if (!lista(col).length) gravar(col, []);
         }
+        gravar('config', { metaMensal:0, modeloNegocio:'outro', reciboSequencia:0, ...c, versaoDados:VERSAO_DADOS });
     }
 
     function obter(chave) {
@@ -145,6 +157,7 @@
     }
     function importar(dados) { validarBackup(dados); const anterior = exportar(); try {
         COLECOES.forEach(k => gravar(k, k === 'config' ? { ...dados[k], versaoDados: Math.min(dados[k].versaoDados || 1, VERSAO_DADOS) } : dados[k] || []));
+        problemas.clear();
         if ((dados.config.versaoDados || 1) < VERSAO_DADOS) migrarDados();
         encerrarSessao();
     }
@@ -155,7 +168,7 @@
         catch (_) { /* Erro original será exibido. */ } });
         throw e;
     } }
-    function limpar() { COLECOES.forEach(k => localStorage.removeItem(PREFIXO + k)); encerrarSessao(); sessaoRemover(chaveTentativas); sessaoRemover(chaveBloqueio); }
+    function limpar() { COLECOES.forEach(k => localStorage.removeItem(PREFIXO + k)); problemas.clear(); encerrarSessao(); sessaoRemover(chaveTentativas); sessaoRemover(chaveBloqueio); }
     function exemplo(tipo) {
         const rapido = tipo === 'rapido';
         const nomes = rapido ? ['Ana Costa', 'Beatriz Santos', 'Carla Oliveira', 'Daniela Rocha', 'Elisa Martins'] : ['Carlos Almeida', 'Mariana Lopes', 'Rafael Souza', 'Fernanda Lima', 'Paulo Mendes'];
