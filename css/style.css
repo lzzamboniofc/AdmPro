@@ -15,7 +15,7 @@
 }
 [data-theme="dark"] {
   color-scheme:dark;
-  --primaria:#3BA3B8;
+  --primaria:#5BC2D6;
   --primaria-hover:#5BB8CB;
   --primaria-suave:#16313A;
   --fundo:#0F1518;
@@ -28,7 +28,7 @@
 @media(prefers-color-scheme:dark) {
   [data-theme="auto"] {
     color-scheme:dark;
-    --primaria:#3BA3B8;
+    --primaria:#5BC2D6;
     --primaria-hover:#5BB8CB;
     --primaria-suave:#16313A;
     --fundo:#0F1518;
@@ -49,7 +49,7 @@ body {
   margin:0;
   background:var(--fundo);
   color:var(--texto);
-  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-family:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   line-height:1.45;
   overflow-x:hidden
 }
@@ -1042,4 +1042,70 @@ svg.icone {
     font-size:11px;
   }
   #print-area .print-assinatura img { object-fit:contain; width:110px; height:auto; }
+}
+
+/* Segurança local, menu de perfil e melhorias de acessibilidade. */
+#conteudo, .card, .sheet, .list-card, .grow, .detail-row { overflow-wrap:anywhere; }
+.topbar { min-width:0; }
+.user-menu { position:relative; flex:none; }
+.avatar-button { width:44px; height:44px; border-radius:999px; border:1px solid var(--borda); background:var(--primaria-suave); color:var(--texto); font-weight:700; }
+.user-dropdown { position:absolute; right:0; top:48px; z-index:35; background:var(--superficie); border:1px solid var(--borda); border-radius:14px; box-shadow:var(--sombra); width:190px; padding:8px; }
+.user-dropdown a, .user-dropdown button { display:flex; align-items:center; width:100%; min-height:44px; text-align:left; padding:8px 12px; color:var(--texto); border:0; background:transparent; border-radius:10px; text-decoration:none; font:inherit; }
+.user-dropdown a:hover, .user-dropdown button:hover { background:var(--primaria-suave); }
+.user-dropdown .danger, .sair-sidebar { color:var(--erro); }
+.sair-sidebar { display:none; }
+.tela-seguranca { max-width:440px; margin:0 auto; text-align:center; padding:16px 0 48px; }
+.tela-seguranca .marca-vertical { display:block; width:168px; height:168px; max-width:100%; object-fit:contain; margin:0 auto 12px; }
+.tela-seguranca .pin-label { display:block; margin:20px 0 8px; text-align:left; font-weight:600; }
+.tela-seguranca .pin-input { text-align:center; letter-spacing:.6em; font-size:24px; font-variant-numeric:tabular-nums; height:52px; width:100%; border:1px solid var(--borda); border-radius:10px; color:var(--texto); background:var(--superficie); }
+.teclado-pin { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:20px auto; max-width:312px; }
+.teclado-pin button { min-height:64px; border:1px solid var(--borda); border-radius:14px; color:var(--texto); font-size:24px; font-weight:600; background:var(--superficie); }
+.teclado-pin button:disabled { opacity:.45; }
+.tela-seguranca .pin-erro { min-height:24px; color:var(--erro); font-size:14px; margin:8px 0; }
+.sheet { overscroll-behavior:contain; padding-bottom:calc(32px + env(safe-area-inset-bottom)); scroll-padding-bottom:80px; }
+.sheet .form-grid { padding-bottom:12px; }
+body.modal-aberto { overflow:hidden; position:fixed; width:100%; }
+body.modal-aberto .modal-layer { overscroll-behavior:contain; }
+[data-theme="dark"] .chip, [data-theme="auto"] .chip { font-weight:600; }
+@media (min-width:1024px) {
+  .sair-sidebar { display:flex; gap:12px; align-items:center; width:calc(224px - 24px); position:fixed; left:12px; bottom:16px; min-height:48px; padding:12px 16px; border:1px solid var(--borda); border-radius:10px; background:var(--superficie); cursor:pointer; }
+  .user-menu { display:none; }
+  .navegacao { padding-bottom:84px; }
+}
+@media (max-width:767px) {
+  .sheet { max-height:min(92dvh, calc(100dvh - env(safe-area-inset-top))); }
+}
+@media (max-width:400px) { .topbar-identidade .topbar-nome { max-width:106px; } }
+/* Feedback não bloqueia ações como o botão flutuante. */
+.toast { pointer-events:none; }
+/* Contraste AA para controles e chips no fundo escuro. */
+[data-theme="dark"] .btn:not(.secundario):not(.perigo),
+[data-theme="dark"] .fab { color:#07161A; }
+[data-theme="dark"] .chip.orcamento { color:#C4B5FD; }
+[data-theme="dark"] .chip.agendado { color:#93C5FD; }
+[data-theme="dark"] .chip.andamento { color:#FCD34D; }
+[data-theme="dark"] .chip.concluido { color:#5EEAD4; }
+[data-theme="dark"] .chip.pago { color:#86EFAC; }
+[data-theme="dark"] .chip.cancelado { color:#D1D5DB; }
+[data-theme="dark"] .danger { color:#F87171; }
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] .btn:not(.secundario):not(.perigo),
+  [data-theme="auto"] .fab { color:#07161A; }
+  [data-theme="auto"] .chip.orcamento { color:#C4B5FD; }
+  [data-theme="auto"] .chip.agendado { color:#93C5FD; }
+  [data-theme="auto"] .chip.andamento { color:#FCD34D; }
+  [data-theme="auto"] .chip.concluido { color:#5EEAD4; }
+  [data-theme="auto"] .chip.pago { color:#86EFAC; }
+  [data-theme="auto"] .chip.cancelado { color:#D1D5DB; }
+  [data-theme="auto"] .danger { color:#F87171; }
+}
+/* SVG vertical mantém contraste em ambos os temas sem alterar a marca oficial. */
+.onboarding-marca .marca-vertical,
+.tela-seguranca .marca-vertical {
+  display:block;
+  background:#fff;
+  padding:12px;
+  border:1px solid #E1E7EA;
+  border-radius:14px;
+  object-fit:contain;
 }

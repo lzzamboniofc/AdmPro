@@ -13,6 +13,9 @@
     function deslocarMes(iso, qtde) { const d = parseData((iso || hoje()).slice(0, 7) + '-01'); d.setMonth(d.getMonth() + qtde); return dataISO(d).slice(0, 7); }
     function dinheiro(valor) { return moedaIntl.format(Number(valor) || 0); }
     function numerico(valor) { return (Number(valor) || 0).toFixed(2).replace('.', ','); }
+    function centavos(valor) { return Math.round((Number(valor) || 0) * 100); }
+    function deCentavos(valor) { return valor / 100; }
+    function somarValores(lista) { return deCentavos(lista.reduce((t, v) => t + centavos(v), 0)); }
     function lerMoeda(valor) { if (typeof valor === 'number')
         return Math.round(valor * 100) / 100; const texto = String(valor || '').trim().replace(/[^\d,.-]/g, ''); if (!texto)
         return 0; const normal = texto.includes(',') ? texto.replace(/\./g, '').replace(',', '.') : texto; return Math.round((Number(normal) || 0) * 100) / 100; }
@@ -31,8 +34,8 @@
     function formatarDia(iso) { return parseData(iso).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }); }
     function numeroWhatsapp(telefone) { let d = digitos(telefone); if (d.length === 10 || d.length === 11)
         d = '55' + d; return d; }
-    function somaParcelas(parcelas) { return (parcelas || []).reduce((s, p) => s + Math.round((Number(p.valor) || 0) * 100), 0) / 100; }
-    function totalServico(itens, desconto) { const centavos = (itens || []).reduce((s, i) => s + Math.round(Number(i.precoUnit || 0) * 100) * Number(i.qtd || 0), 0) - Math.round(Number(desconto || 0) * 100); return Math.max(0, centavos) / 100; }
+    function somaParcelas(parcelas) { return deCentavos((parcelas || []).reduce((s, p) => s + centavos(p.valor), 0)); }
+    function totalServico(itens, desconto) { const centavosTotal = (itens || []).reduce((s, i) => s + centavos(i.precoUnit) * Number(i.qtd || 0), 0) - centavos(desconto); return Math.max(0, centavosTotal) / 100; }
     function inicioSemana(iso) { const d = parseData(iso); d.setDate(d.getDate() - d.getDay()); return dataISO(d); }
-    A.utils = { dois, digitos, hoje, dataISO, parseData, exibirData, deslocarDia, deslocarMes, dinheiro, numerico, lerMoeda, mascaraMoeda, mascaraTelefone, id, escapar, horaMinutos, dataHora, dataHoraVisivel, nomeMes, formatarDia, numeroWhatsapp, somaParcelas, totalServico, inicioSemana };
+    A.utils = { dois, digitos, hoje, dataISO, parseData, exibirData, deslocarDia, deslocarMes, dinheiro, numerico, lerMoeda, mascaraMoeda, mascaraTelefone, id, escapar, horaMinutos, dataHora, dataHoraVisivel, nomeMes, formatarDia, numeroWhatsapp, centavos, deCentavos, somarValores, somaParcelas, totalServico, inicioSemana };
 })(window.AdmPro = window.AdmPro || {});

@@ -4,9 +4,9 @@
     const U = A.utils, UI = A.ui, S = A.storage;
     function render() {
         const hoje = U.hoje(), mes = hoje.slice(0, 7), lanc = S.lista('lancamentos').filter(l => l.data.startsWith(mes));
-        const soma = tipo => lanc.filter(l => l.tipo === tipo).reduce((n, l) => n + Number(l.valor || 0), 0);
+        const soma = tipo => U.somarValores(lanc.filter(l => l.tipo === tipo).map(l => l.valor));
         const entradas = soma('entrada'), saidas = soma('saida');
-        const servicos = S.lista('servicos'), abertas = servicos.filter(s => s.status !== 'cancelado').flatMap(s => s.parcelas.filter(p => !p.pago).map(p => ({ ...p, servico: s }))), receber = abertas.reduce((n, p) => n + Number(p.valor), 0);
+        const servicos = S.lista('servicos'), abertas = servicos.filter(s => s.status !== 'cancelado').flatMap(s => s.parcelas.filter(p => !p.pago).map(p => ({ ...p, servico: s }))), receber = U.somarValores(abertas.map(p => p.valor));
         const atrasadas = abertas.filter(p => p.vencimento < hoje).sort((a, b) => a.vencimento.localeCompare(b.vencimento));
         const destaque = A.perfil.destaque === 'orcamento' ? servicos.filter(s => s.status === 'orcamento') : servicos.filter(s => s.data === hoje && s.status !== 'cancelado');
         destaque.sort((a, b) => (a.hora || '').localeCompare(b.hora || ''));

@@ -2,7 +2,7 @@
 (function (A) {
     'use strict';
     const U = A.utils, UI = A.ui, S = A.storage;
-    function render() { const items = S.lista('catalogo').sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')); return `<div class="page-heading"><div><h1>Catálogo</h1><p class="muted">Serviços e produtos disponíveis para orçamentos.</p></div></div><div class="stack">${items.length ? items.map(i => UI.card(`<div class="list-card"><div class="grow"><h3>${U.escapar(i.nome)}</h3><p class="item-meta">${i.categoria === 'produto' ? 'Produto' : 'Serviço'} · ${U.dinheiro(i.preco)} · ${i.ativo ? 'Ativo' : 'Inativo'}</p></div><div class="item-actions"><button class="icon-button" data-edit="${i.id}" aria-label="Editar ${U.escapar(i.nome)}">${UI.icon('edit')}</button><button class="icon-button" data-del="${i.id}" aria-label="Excluir ${U.escapar(i.nome)}">${UI.icon('trash')}</button></div></div><label class="check-row"><input type="checkbox" data-toggle="${i.id}" ${i.ativo ? 'checked' : ''}>Ativo no formulário</label>`)).join('') : UI.vazio('Catálogo vazio', 'Adicione serviços ou produtos com seus preços.', 'Adicionar item', 'novoItem')}</div>`; }
+    function render() { const items = S.lista('catalogo').sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')); return `<div class="page-heading"><div><h1>Catálogo</h1><p class="muted">Serviços e produtos disponíveis para orçamentos.</p></div></div><div class="stack">${items.length ? items.map(i => UI.card(`<div class="list-card"><div class="grow"><h3>${U.escapar(i.nome)}</h3><p class="item-meta">${i.categoria === 'produto' ? 'Produto' : 'Serviço'} · ${U.dinheiro(i.preco)} · ${i.ativo ? 'Ativo' : 'Inativo'}</p></div><div class="item-actions"><button class="icon-button" data-edit="${U.escapar(i.id)}" aria-label="Editar ${U.escapar(i.nome)}">${UI.icon('edit')}</button><button class="icon-button" data-del="${U.escapar(i.id)}" aria-label="Excluir ${U.escapar(i.nome)}">${UI.icon('trash')}</button></div></div><label class="check-row"><input type="checkbox" data-toggle="${U.escapar(i.id)}" ${i.ativo ? 'checked' : ''}>Ativo no formulário</label>`)).join('') : UI.vazio('Catálogo vazio', 'Adicione serviços ou produtos com seus preços.', 'Adicionar item', 'novoItem')}</div>`; }
     function bind(root) { root.addEventListener('click', e => { const editar = e.target.closest('[data-edit]'), apagar = e.target.closest('[data-del]'); if (editar)
         abrirForm(editar.dataset.edit); if (e.target.closest('[data-action="novoItem"]'))
         abrirForm(); if (apagar) {
@@ -17,10 +17,10 @@
         return; const d = new FormData(f); const preco = U.lerMoeda(d.get('preco')); if (preco <= 0) {
         UI.erro(f, 'preco', 'Informe um preço maior que zero.');
         return;
-    } UI.tratarErro(() => { const dados = { nome: d.get('nome').trim(), categoria: d.get('categoria'), preco, duracaoMin: Math.max(0, Number(d.get('duracaoMin')) || 0), ativo: d.has('ativo') }; if (id)
+    } const salvar = f.querySelector('[type="submit"]'); salvar.disabled = true; UI.tratarErro(() => { const dados = { nome: d.get('nome').trim(), categoria: d.get('categoria'), preco, duracaoMin: Math.max(0, Number(d.get('duracaoMin')) || 0), ativo: d.has('ativo') }; if (id)
         S.atualizar('catalogo', id, dados);
     else
-        S.adicionar('catalogo', { id: U.id(), ...dados }); UI.fechar(); A.app.refresh(); UI.toast('Catálogo atualizado.'); }); }; }); }
+        S.adicionar('catalogo', { id: U.id(), ...dados }); UI.fechar(); A.app.refresh(); UI.toast('Catálogo atualizado.'); }); if (f.isConnected) salvar.disabled = false; }; }); }
     A.views = A.views || {};
     A.views.catalogo = { render, bind, abrirForm };
 })(window.AdmPro = window.AdmPro || {});

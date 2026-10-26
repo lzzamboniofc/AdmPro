@@ -3,6 +3,7 @@
     'use strict';
     const U = A.utils, UI = A.ui;
     let passo = 1;
+    let usarExemplo = false;
     let rascunho = { nomeNegocio: '', telefone: '', tipoNegocio: 'rapido', horaInicio: '08:00', horaFim: '18:00', diasAtendimento: [1, 2, 3, 4, 5, 6] };
     const dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     function render() {
@@ -15,7 +16,9 @@
             interior = `<h1>Horário de atendimento</h1><p class="muted" style="margin:12px 0 24px">Escolha seus dias e seu horário habitual.</p><form id="horario-form" class="form-grid"><div class="form-grid duas">${UI.campo('Início', 'horaInicio', rascunho.horaInicio, { type: 'time', required: true })}${UI.campo('Fim', 'horaFim', rascunho.horaFim, { type: 'time', required: true })}</div><div class="field"><span class="label">Dias de atendimento</span><div class="dias">${dias.map((d, i) => `<label><input type="checkbox" name="dia" value="${i}" ${rascunho.diasAtendimento.includes(i) ? 'checked' : ''}>${d}</label>`).join('')}</div><div class="field-error" id="dias-erro"></div></div><div class="actions"><button class="btn secundario" data-prev type="button">Voltar</button><button class="btn" type="submit">Continuar</button></div></form>`;
         if (passo === 4)
             interior = `<h1>Pronto para começar!</h1><p class="muted" style="margin:12px 0 24px">Escolha se prefere explorar exemplos ou cadastrar tudo do zero.</p><div class="stack"><button class="btn" data-finish="exemplo">Começar com dados de exemplo</button><button class="btn secundario" data-finish="vazio">Começar vazio</button><button class="btn ghost" data-prev>Voltar</button></div>`;
-        return `<div class="onboarding"><div class="onboarding-marca"><img class="marca-tema-claro" src="img/logo/svg/logo-vertical.svg" alt="AdmPro — Gestão simples" width="176" height="176"><img class="marca-tema-escuro" src="img/logo/svg/logo-horizontal-negativo.svg" alt="AdmPro — Gestão simples" width="176" height="47"></div><div class="progress">Etapa ${Math.min(passo, 3)} de 3</div>${UI.card(interior)}</div>`;
+        if (passo === 5)
+            interior = `<h1>Crie um PIN de 4 dígitos</h1><p class="muted" style="margin:12px 0 24px">O PIN será exigido após fechar e reabrir a aba. Não é uma autenticação remota.</p><form id="form-pin-inicial" class="form-grid">${UI.campo('Novo PIN', 'pin', '', { required:true, type:'password', attrs:'inputmode="numeric" maxlength="4" pattern="[0-9]{4}" autocomplete="new-password"' })}${UI.campo('Confirmar PIN', 'confirmaPin', '', { required:true, type:'password', attrs:'inputmode="numeric" maxlength="4" pattern="[0-9]{4}" autocomplete="new-password"' })}<p class="pin-erro" role="alert" id="pin-erro-inicial"></p><div class="actions"><button class="btn secundario" type="button" data-prev>Voltar</button><button class="btn" type="submit">Concluir configuração</button></div></form>`;
+        return `<div class="onboarding"><div class="onboarding-marca"><img class="marca-vertical" src="img/logo/svg/logo-vertical.svg" alt="AdmPro — Gestão simples" width="176" height="176"></div><div class="progress">Etapa ${Math.min(passo, 4)} de 4</div>${UI.card(interior)}</div>`;
     }
     function bind(root) {
         UI.mascara(root);
@@ -28,8 +31,20 @@
             root.querySelector('#dias-erro').textContent = 'Selecione dias e informe um horário final posterior ao inicial.';
             return;
         } rascunho.horaInicio = f.elements.namedItem('horaInicio').value; rascunho.horaFim = f.elements.namedItem('horaFim').value; rascunho.diasAtendimento = dias; passo = 4; A.app.refresh(); });
-        root.querySelectorAll('[data-finish]').forEach(b => b.onclick = () => UI.tratarErro(() => { A.storage.gravar('config', { ...rascunho, logoBase64: '', tema: 'auto' }); if (b.dataset.finish === 'exemplo')
-            A.storage.exemplo(rascunho.tipoNegocio); passo = 1; A.app.iniciar(); UI.toast('Seu negócio está pronto!'); }));
+        root.querySelectorAll('[data-finish]').forEach(b => b.onclick = () => { usarExemplo = b.dataset.finish === 'exemplo'; passo = 5; A.app.refresh(); });
+        root.querySelector('#form-pin-inicial')?.addEventListener('submit', async e => {
+            e.preventDefault();
+            const f = e.currentTarget;
+            const pin = f.elements.pin.value;
+            if (!/^\d{4}$/.test(pin) || pin !== f.elements.confirmaPin.value) { root.querySelector('#pin-erro-inicial').textContent = 'Os dois PINs devem ser iguais e conter 4 dígitos.'; return; }
+            const btn = f.querySelector('[type="submit"]'); btn.disabled = true;
+            try {
+                const credenciais = await A.storage.hashPin(pin);
+                A.storage.gravar('config', { ...rascunho, logoBase64:'', tema:'auto', versaoDados:2, ...credenciais });
+                if (usarExemplo) A.storage.exemplo(rascunho.tipoNegocio);
+                A.storage.abrirSessao(); passo = 1; A.app.iniciar(); UI.toast('Seu negócio está pronto!');
+            } catch (erro) { root.querySelector('#pin-erro-inicial').textContent = erro.message; btn.disabled = false; }
+        });
     }
     A.views = A.views || {};
     A.views.onboarding = { render, bind };
