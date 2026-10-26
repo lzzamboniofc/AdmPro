@@ -85,19 +85,19 @@
         const antesEnt = somar(lancamentos.filter(l => l.tipo === 'entrada' && dentro(l.data, p.anteriorInicio, p.anteriorFim)).map(l => l.valor));
         const faturamento = somar(e.map(l => l.valor));
         const variacao = (a, b) => b ? Math.round((a - b) / b * 100) : a ? 100 : 0;
-        const agregar = (lista, chave, valor) => {
+        const agregar = (lista, chave, valor, quantidade = () => 1) => {
             const grupos = new Map();
             lista.forEach(item => {
                 const k = chave(item);
                 const anterior = grupos.get(k) || { nome: k, qtd: 0, valor: 0 };
-                anterior.qtd++;
+                anterior.qtd += Number(quantidade(item) || 0);
                 anterior.valor = moeda(cent(anterior.valor) + cent(valor(item)));
                 grupos.set(k, anterior);
             });
             return [...grupos.values()];
         };
         const itens = serv.flatMap(s => s.itens.map(i => ({ ...i, valor: i.qtd * i.precoUnit })));
-        const produtos = agregar(itens, i => i.nome, i => i.valor);
+        const produtos = agregar(itens, i => i.nome, i => i.valor, i => i.qtd);
         const clientesTop = agregar(serv, s => s.clienteId, s => s.total).map(c => ({ ...c, nome: clientes.find(x => x.id === c.nome)?.nome || 'Cliente' }));
         const sumidos = clientes.filter(c => {
             const datas = servicos.filter(s => s.clienteId === c.id && s.status !== 'cancelado').map(s => s.data).sort();

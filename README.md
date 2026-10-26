@@ -37,3 +37,49 @@ Os arquivos oficiais enviados foram preservados em `img/logo/`. O cabeçalho e o
 A migração automática `versaoDados: 2` conserva clientes, catálogo, serviços, lançamentos e demais campos antigos. O hash do PIN fica em `config.pinHash`; `sessionStorage` é utilizado exclusivamente dentro de `storage.js` e dura enquanto a aba estiver aberta. PIN de quatro números e hash local **não protegem contra alguém com acesso ao armazenamento do navegador**. Em contextos com Web Crypto, usa SHA-256; em `file://` sem Web Crypto, usa um hash FNV-1a documentado (não criptográfico). Migrar para autenticação de servidor em produção.
 
 Manrope está listada na pilha CSS como fonte opcional; não se baixa fonte externa, preservando uso offline e sem CDN. Para recuperar um PIN perdido é necessário limpar dados e recadastrar (um backup com PIN também restaura o PIN).
+
+## Versão 3 — Gestão complementar
+
+A migração para `versaoDados: 3` acontece automaticamente na inicialização, preservando clientes, catálogo, serviços, parcelas, lançamentos e PIN anteriores. Foram adicionadas as coleções `profissionais`, `despesasFixas` e `movimentacoesEstoque`. As novas coleções fazem parte do backup JSON; backups antigos continuam aceitos e são migrados depois de importados.
+
+Os cálculos de metas, relatórios, recorrência, estoque, despesas fixas e comissões ficam em `js/regras.js` (funções puras). `js/storage.js` continua sendo o único arquivo autorizado a usar `localStorage` e `sessionStorage` e coordena as baixas, estornos, lançamentos e criação idempotente de registros. O cadastro de profissionais não cria login nem substitui o PIN local.
+
+### Novidades
+
+- **Lembretes:** no detalhe do serviço, na Agenda e no Início. Abrem o WhatsApp do cliente; o registro indica que a mensagem foi preparada. O usuário ainda precisa enviá-la no WhatsApp.
+- **Recibos:** disponíveis para parcelas pagas, com numeração sequencial guardada na configuração, impressão pelo navegador e resumo para WhatsApp.
+- **Recorrência:** configure dias, semanas ou meses; a próxima ocorrência nasce na primeira conclusão/quitação, uma só vez. O fim de mês é ajustado ao calendário.
+- **Metas:** Configurações → Gestão → Meta mensal. O Início mostra progresso e projeção linear pelo dia do mês.
+- **Relatórios:** terceira aba no Financeiro. Valores financeiros de faturamento vêm dos lançamentos de entrada. Quantidade de serviços considera a data do serviço. O ranking por quantidade soma unidades dos itens (`qtd`), e não linhas de venda.
+- **Despesas fixas:** lançamento automático da competência corrente, uma vez por despesa, mesmo que o lançamento tenha sido excluído depois.
+- **Comissões:** valor calculado sobre as parcelas pagas no mês; o botão de pagamento gera saída financeira avulsa.
+- **Estoque:** quantidades e mínimo no catálogo; movimentos e ajustes em Gestão → Estoque. A conclusão baixa itens do tipo produto controlado; reabrir/cancelar estorna.
+- **Modelos:** oito perfis em `js/modelos.js`. Alterar o modelo não apaga catálogo ou serviços anteriores. Itens demonstrativos adicionais dependem de confirmação.
+
+### PWA: instalar e testar offline
+
+O aplicativo continua abrindo por `file://` (sem service worker). Para instalar e testar o cache offline, é necessário servi-lo sob `http://localhost` ou HTTPS:
+
+1. Abra esta pasta no VS Code e escolha **Live Server → Open with Live Server**, ou execute `npx serve .` no terminal (o segundo comando exige Node/npm e pode baixar o pacote `serve`, mas **não é uma dependência do AdmPro**).
+2. Acesse o endereço local informado pelo servidor (por exemplo, `http://localhost:5500/index.html`).
+3. Abra uma vez com conexão de rede disponível. Confirme em DevTools → Application → Service Workers que `sw.js` está ativo. Em Application → Cache Storage, confira `admpro-estaticos-v3-1`.
+4. Vá a Configurações → Instalação e escolha **Instalar app**, se disponível. No Safari do iPhone use **Compartilhar → Adicionar à Tela de Início**.
+5. Em DevTools → Network, ative **Offline** e recarregue: os arquivos estáticos devem permanecer disponíveis. Os dados continuam exclusivamente neste navegador.
+6. Ao atualizar o projeto, altere o valor de `CACHE` em `sw.js` para forçar o navegador a preparar a nova versão. A confirmação **Atualizar** ativa a versão que está aguardando.
+
+**Atenção:** no primeiro acesso offline sem cache prévio, nenhuma PWA pode carregar. Os favicons e logos do ZIP original são mantidos. Sem rede, WhatsApp não abre, embora o app e os dados locais permaneçam acessíveis.
+
+### Roteiro de testes manuais
+
+1. **Lembrete:** crie um agendamento para amanhã; veja o botão no Início/Agenda/detalhe, abra o WhatsApp e confira o selo após retornar.
+2. **Recibo:** pague uma parcela; gere o recibo e imprima em PDF; confira o número sequencial, valores e texto por extenso; teste o resumo pelo WhatsApp.
+3. **Recorrência:** agende 31/01, marque 1 mês, conclua; verifique fevereiro (28/29), volte de status e conclua outra vez; apenas um sucessor deve existir.
+4. **Meta:** salve a meta em Gestão, confira percentual e projeção no Início.
+5. **Relatórios:** crie entradas/saídas e compare os totais da aba Relatórios com os lançamentos do período; teste os quatro filtros.
+6. **Despesas fixas:** cadastre aluguel para o dia 10; recarregue cinco vezes e confirme um lançamento da competência corrente. Apague esse lançamento e recarregue; ele não deverá reaparecer.
+7. **Profissionais:** cadastre comissão de 10%, selecione um profissional em um serviço, pague R$ 100 e confira comissão de R$ 10. Registre o pagamento e confira a saída.
+8. **Estoque:** crie um produto com quantidade 10, mínimo 2 e use 3 unidades num serviço; conclua e verifique 7; reabra/cancele e verifique 10.
+9. **PWA:** siga as etapas acima, confira instalação e recarregamento offline via HTTP local. Confirme que `file://` não gera erro de SW.
+10. **Modelos:** selecione cada modelo no onboarding; em Configurações altere o modelo e confirme que os dados existentes permanecem iguais. Teste a nomenclatura de assistência técnica.
+
+Para investigar limitações específicas de navegadores móveis, valide também nas larguras de 360, 390, 768 e 1280px, em temas claro e escuro.
