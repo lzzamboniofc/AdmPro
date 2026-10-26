@@ -37,5 +37,39 @@
     function somaParcelas(parcelas) { return deCentavos((parcelas || []).reduce((s, p) => s + centavos(p.valor), 0)); }
     function totalServico(itens, desconto) { const centavosTotal = (itens || []).reduce((s, i) => s + centavos(i.precoUnit) * Number(i.qtd || 0), 0) - centavos(desconto); return Math.max(0, centavosTotal) / 100; }
     function inicioSemana(iso) { const d = parseData(iso); d.setDate(d.getDate() - d.getDay()); return dataISO(d); }
-    A.utils = { dois, digitos, hoje, dataISO, parseData, exibirData, deslocarDia, deslocarMes, dinheiro, numerico, lerMoeda, mascaraMoeda, mascaraTelefone, id, escapar, horaMinutos, dataHora, dataHoraVisivel, nomeMes, formatarDia, numeroWhatsapp, centavos, deCentavos, somarValores, somaParcelas, totalServico, inicioSemana };
+    // Valor por extenso em pt-BR até 999.999.999,99, sem dependências.
+    function valorPorExtenso(valor) {
+        const cent = Math.abs(centavos(valor));
+        if (cent > 99999999999) return 'valor acima do limite';
+        const unidades = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
+        const especiais = ['dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
+        const dezenas = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
+        const centenas = ['', 'cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+        function trio(n) {
+            if (n === 100) return 'cem';
+            const partes = []; const c = Math.floor(n / 100); let rest = n % 100;
+            if (c) partes.push(centenas[c]);
+            if (rest >= 10 && rest < 20) partes.push(especiais[rest - 10]);
+            else { const d = Math.floor(rest / 10); rest %= 10; if (d) partes.push(dezenas[d]); if (rest) partes.push(unidades[rest]); }
+            return partes.join(' e ');
+        }
+        function inteiro(n) {
+            if (!n) return '';
+            const grupos = [Math.floor(n / 1000000), Math.floor((n % 1000000) / 1000), n % 1000];
+            const partes = [];
+            if (grupos[0]) partes.push(trio(grupos[0]) + (grupos[0] === 1 ? ' milhão' : ' milhões'));
+            if (grupos[1]) partes.push((grupos[1] === 1 ? '' : trio(grupos[1]) + ' ') + 'mil');
+            if (grupos[2]) partes.push(trio(grupos[2]));
+            if (partes.length < 2) return partes[0];
+            const ultimo = grupos[2];
+            const uniao = ultimo && (ultimo < 100 || ultimo % 100 === 0) ? ' e ' : ' ';
+            return partes.slice(0, -1).join(', ') + uniao + partes[partes.length - 1];
+        }
+        const reais = Math.floor(cent / 100), centimos = cent % 100;
+        const partes = [];
+        if (reais) partes.push(inteiro(reais) + (reais >= 1000000 && reais % 1000000 === 0 ? ' de' : '') + (reais === 1 ? ' real' : ' reais'));
+        if (centimos) partes.push(trio(centimos) + (centimos === 1 ? ' centavo' : ' centavos'));
+        return partes.join(' e ') || 'zero reais';
+    }
+    A.utils = { dois, digitos, hoje, dataISO, parseData, exibirData, deslocarDia, deslocarMes, dinheiro, numerico, lerMoeda, mascaraMoeda, mascaraTelefone, id, escapar, horaMinutos, dataHora, dataHoraVisivel, nomeMes, formatarDia, numeroWhatsapp, centavos, deCentavos, somarValores, valorPorExtenso, somaParcelas, totalServico, inicioSemana };
 })(window.AdmPro = window.AdmPro || {});

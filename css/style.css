@@ -1109,3 +1109,37 @@ body.modal-aberto .modal-layer { overscroll-behavior:contain; }
   border-radius:14px;
   object-fit:contain;
 }
+
+/* Gestão estendida, relatórios e PWA: todos mobile first. */
+.modelos-grade { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.modelos-grade .option-card { min-width:0; width:100%; padding:16px 8px; min-height:136px; align-items:center; text-align:center; }
+.modelos-grade .option-card strong { font-size:14px; overflow-wrap:anywhere; }
+.modelos-grade .modelo-icone { font-size:28px; line-height:1.2; color:var(--primaria); }
+.modelos-grade .option-card small { font-size:12px; }
+.gestao-links { display:flex; flex-direction:column; }
+.gestao-links a { padding:12px 8px; min-height:48px; display:flex; align-items:center; text-decoration:none; border-bottom:1px solid var(--borda); font-weight:600; }
+.gestao-links a:last-child { border-bottom:0; }
+.stock-fields { display:grid; gap:12px; border:1px solid var(--borda); padding:12px; border-radius:10px; }
+.estoque-baixo,.danger { color:var(--erro); }
+.badge-sutil { display:inline-flex; align-items:center; border-radius:999px; background:var(--primaria-suave); color:var(--texto); padding:4px 10px; font-size:12px; margin:8px 4px 0 0; }
+.ata-recebimentos { margin:16px 0; }
+.meta-trilha { width:100%; height:12px; border-radius:999px; background:var(--borda); overflow:hidden; margin:12px 0; }
+.meta-progresso { height:100%; background:var(--texto-secundario); border-radius:999px; min-width:0; transition:width 180ms ease; }
+.meta-progresso.meta-primaria { background:var(--primaria); }
+.meta-progresso.meta-sucesso { background:var(--sucesso); }
+.relatorio-linha { display:flex; justify-content:space-between; align-items:center; gap:12px; border-bottom:1px solid var(--borda); padding:12px 0; min-width:0; }
+.relatorio-linha > * { min-width:0; overflow-wrap:anywhere; }
+.relatorio-linha strong { text-align:right; font-variant-numeric:tabular-nums; }
+.categoria-barra { padding:8px 0; }
+.categoria-barra > div:first-child { display:flex; justify-content:space-between; gap:12px; }
+.categoria-barra .meta-trilha { margin:4px 0; }
+.agenda-envoltorio { min-width:0; display:grid; gap:4px; }
+.agenda-envoltorio .agenda-item { width:100%; }
+.recorrencia-form { display:grid; gap:12px; border:1px solid var(--borda); padding:12px; border-radius:14px; }
+.recorrencia-form .actions { display:flex; flex-wrap:wrap; gap:8px; }
+.offline-badge { font-size:12px; color:var(--alerta); border:1px solid currentColor; border-radius:999px; padding:4px 8px; margin:0 4px; }
+.toast-acao { pointer-events:auto; display:flex; align-items:center; gap:12px; }
+.toast-acao button { min-height:44px; padding:8px; border:1px solid #fff; color:#fff; background:transparent; border-radius:10px; font-weight:600; }
+.segmeneted, .segmented { max-width:100%; overflow-x:auto; }
+@media (min-width:768px) { .modelos-grade { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+@media (prefers-reduced-motion:reduce) { .meta-progresso { transition:none; } }
