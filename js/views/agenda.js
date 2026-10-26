@@ -1,0 +1,18 @@
+/* Agenda diária e semanal com seleção de horários livres. */
+(function (A) {
+    'use strict';
+    const U = A.utils, UI = A.ui, S = A.storage;
+    let dia = U.hoje(), visao = 'dia';
+    const compromissos = (data) => S.lista('servicos').filter(s => s.data === data && s.status !== 'cancelado' && s.hora).sort((a, b) => a.hora.localeCompare(b.hora));
+    function card(s) { return `<button type="button" class="agenda-item" data-abrir="${U.escapar(s.id)}"><strong>${U.escapar(s.hora)} · ${U.escapar(S.porId('clientes', s.clienteId)?.nome || 'Cliente')}</strong><span>${U.escapar(s.titulo)}</span>${UI.chip(s.status)}</button>`; }
+    function telaDia() { const config = S.obter('config'); const ini = U.horaMinutos(config.horaInicio || '08:00'), fim = U.horaMinutos(config.horaFim || '18:00'); const slots = []; const agendados = compromissos(dia); for (let minuto = ini; minuto < fim; minuto += 60) {
+        const hora = U.dois(Math.floor(minuto / 60)) + ':' + U.dois(minuto % 60);
+        const nessa = agendados.filter(s => U.horaMinutos(s.hora) >= minuto && U.horaMinutos(s.hora) < minuto + 60);
+        slots.push(`<div class="agenda-slot"><span class="agenda-hora">${hora}</span><div class="agenda-compromissos">${nessa.map(card).join('')}<button class="agenda-empty" data-criar="${dia}" data-hora="${hora}" aria-label="Agendar às ${hora}">+ Agendar ${hora}</button></div></div>`);
+    } return slots.length ? slots.join('') : UI.vazio('Sem horários configurados', 'Ajuste o horário em Configurações.'); }
+    function telaSemana() { const inicio = U.inicioSemana(dia); return `<div class="semana">${Array.from({ length: 7 }, (_, i) => { const data = U.deslocarDia(inicio, i), comp = compromissos(data); return `<section class="card semana-dia"><h3>${['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][i]} ${U.exibirData(data).slice(0, 5)}</h3>${comp.map(card).join('') || '<p class="muted">Sem agenda</p>'}<button class="btn secundario compacto" data-criar="${data}" data-hora="${S.obter('config').horaInicio || '09:00'}" style="margin-top:8px;width:100%">+ Horário</button></section>`; }).join('')}</div>`; }
+    function render() { return `<div class="page-heading"><div><h1>Agenda</h1><p class="muted">Seus compromissos e horários.</p></div></div><div class="toolbar"><div class="segmented" aria-label="Visualização"><button data-view="dia" aria-pressed="${visao === 'dia'}">Dia</button><button data-view="semana" aria-pressed="${visao === 'semana'}">Semana</button></div><button class="btn secundario compacto" data-hoje>Hoje</button></div><div class="toolbar"><button class="icon-button" data-mover="-1" aria-label="Período anterior">${UI.icon('back')}</button><strong>${visao === 'dia' ? U.formatarDia(dia) : `Semana de ${U.exibirData(U.inicioSemana(dia))}`}</strong><button class="icon-button" data-mover="1" aria-label="Próximo período">${UI.icon('next')}</button></div>${visao === 'dia' ? telaDia() : telaSemana()}`; }
+    function bind(root) { root.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { visao = b.dataset.view; A.app.refresh(); }); root.querySelector('[data-hoje]').onclick = () => { dia = U.hoje(); A.app.refresh(); }; root.querySelectorAll('[data-mover]').forEach(b => b.onclick = () => { dia = U.deslocarDia(dia, Number(b.dataset.mover) * (visao === 'semana' ? 7 : 1)); A.app.refresh(); }); root.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => A.app.ir('#/servicos/' + encodeURIComponent(b.dataset.abrir))); root.querySelectorAll('[data-criar]').forEach(b => b.onclick = () => A.views.servicos.abrirForm(null, { data: b.dataset.criar, hora: b.dataset.hora })); }
+    A.views = A.views || {};
+    A.views.agenda = { render, bind };
+})(window.AdmPro = window.AdmPro || {});
