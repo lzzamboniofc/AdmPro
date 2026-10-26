@@ -989,3 +989,57 @@ svg.icone {
 .segmented button {
   min-height: 44px;
 }
+
+
+/* Identidade AdmPro: versão clara/escura sem scripts ou chamadas externas. */
+.topbar-identidade {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex:1;
+  min-width:0;
+}
+.admpro-marca {
+  display:inline-flex;
+  align-items:center;
+  flex:none;
+  min-height:44px;
+}
+.admpro-marca img { display:block; width:107px; height:28px; object-fit:contain; }
+.marca-tema-escuro { display:none!important; }
+[data-theme="dark"] .marca-tema-escuro { display:block!important; }
+[data-theme="dark"] .marca-tema-claro { display:none!important; }
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] .marca-tema-escuro { display:block!important; }
+  [data-theme="auto"] .marca-tema-claro { display:none!important; }
+}
+.topbar-identidade .topbar-nome {
+  flex:1;
+  min-width:0;
+  padding-left:12px;
+  border-left:1px solid var(--borda);
+  font-size:14px;
+}
+.topbar-identidade .topbar-nome span { min-width:0; }
+.onboarding-marca { display:flex; justify-content:center; align-items:center; padding:0 0 24px; }
+.onboarding-marca img.marca-tema-claro { width:176px; height:176px; object-fit:contain; }
+.onboarding-marca img.marca-tema-escuro { width:176px; height:auto; object-fit:contain; }
+@media (max-width:400px) {
+  .topbar-identidade { gap:8px; }
+  .admpro-marca img { width:94px; height:25px; }
+  .topbar-identidade .topbar-nome { font-size:12px; padding-left:8px; }
+  .topbar-identidade .logo { width:24px; height:24px; }
+}
+@media print {
+  #print-area .print-assinatura {
+    display:flex;
+    align-items:center;
+    gap:12px;
+    border-top:1px solid #aaa;
+    padding-top:12px;
+    margin-top:36px;
+    color:#555;
+    font-size:11px;
+  }
+  #print-area .print-assinatura img { object-fit:contain; width:110px; height:auto; }
+}

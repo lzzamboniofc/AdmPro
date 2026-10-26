@@ -29,7 +29,7 @@
         topo.hidden = false;
         nav.hidden = false;
         const c = S.obter('config');
-        topo.innerHTML = `<div class="topbar-nome">${c.logoBase64 ? `<img class="logo" src="${c.logoBase64}" alt="Logo do negócio">` : ''}<span>${U.escapar(c.nomeNegocio)}</span></div><a href="#/config" class="icon-button" aria-label="Configurações">${UI.icon('config')}</a>`;
+        topo.innerHTML = `<div class="topbar-identidade"><a class="admpro-marca" href="#/inicio" aria-label="AdmPro: ir ao início"><img class="marca-tema-claro" src="img/logo/svg/logo-horizontal.svg" alt="AdmPro" width="107" height="28"><img class="marca-tema-escuro" src="img/logo/svg/logo-horizontal-negativo.svg" alt="" width="107" height="28"></a><div class="topbar-nome">${c.logoBase64 ? `<img class="logo" src="${c.logoBase64}" alt="Logo do negócio">` : ''}<span title="${U.escapar(c.nomeNegocio)}">${U.escapar(c.nomeNegocio)}</span></div></div><a href="#/config" class="icon-button" aria-label="Configurações">${UI.icon('config')}</a>`;
         nav.innerHTML = menu.map(([id, label]) => `<a href="#/${id}" class="nav-item ${r.nome === id || (r.nome === 'detalhe' && id === 'servicos') ? 'ativo' : ''}" ${r.nome === id ? 'aria-current="page"' : ''}>${UI.icon(id)}<span>${label}</span></a>`).join('');
         const view = r.nome === 'detalhe' ? A.views.servicos : A.views[r.nome];
         main.innerHTML = r.nome === 'detalhe' ? view.detalheHTML(r.id) : view.render();
