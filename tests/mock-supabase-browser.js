@@ -21,7 +21,7 @@
     'financeiro.ver','financeiro.editar','financeiro.receber','estoque.ver','estoque.editar',
     'relatorios.operacionais','config.editar','auditoria.ver','assinatura.gerenciar'
   ].map(k=>[k,true]));
-  const permissoesRecepcao={'agenda.ver_todas':true,'agenda.editar':true,'clientes.ver':true,'clientes.editar':true,'catalogo.ver':true};
+  const permissoesRecepcao={'agenda.ver_todas':true,'agenda.editar':true,'atendimentos.ver_todos':true,'clientes.ver':true,'clientes.editar':true,'catalogo.ver':true,'financeiro.receber':true};
   const permissoesProfissional={
     'agenda.propria':true,'atendimentos.proprios':true,'atendimentos.atualizar_proprios':true,
     'clientes.vinculados':true
@@ -47,8 +47,14 @@
     data:hoje,hora:'10:00',duracaoMin:60,profissionalId:'prof-ana',
     itens:[],parcelas:[],total:120,desconto:0,historico:[{status:'agendado',em:new Date().toISOString()}]
   });
+  upsert(empresa1,'servicos','atend-recepcao',{
+    id:'atend-recepcao',clienteId:'cliente-ana',titulo:'Recepção',
+    status:'concluido',data:hoje,hora:'11:00',duracaoMin:60,profissionalId:'prof-bruno',
+    itens:[],parcelas:[{id:'parcela-recepcao',valor:80,vencimento:hoje,pago:false}],
+    total:80,desconto:0,etapas:[],historico:[{status:'concluido',em:new Date().toISOString()}]
+  });
   const membro=id=>({
-    conta_id:id,conta:empresas.find(x=>x.id===id),papel:perfil==='profissional'?'profissional':perfil==='convidado'?'recepcionista':'dono',
+    conta_id:id,conta:empresas.find(x=>x.id===id),papel:perfil==='profissional'?'profissional':(perfil==='convidado'||perfil==='recepcao')?'recepcionista':'dono',
     profissional_id:perfil==='profissional'?'prof-ana':null,ativo:true,permissoes:{}
   });
   const conviteTeste='30000000-0000-4000-8000-000000000999';
@@ -56,15 +62,16 @@
   const convites=perfil==='convidado'?[{id:conviteTeste,email:'convidado@example.test',papel:'recepcionista',
     conta_id:empresa1,nome_negocio:'Estúdio Principal',expira_em:new Date(Date.now()+7*86400000).toISOString()}]:[];
   function result(data=null){return {data,error:null}};
-  let signed=true;
+  let signed=true,revogado=false,limitado=false;
   const user={id:uid,email:perfil==='profissional'?'ana@example.test':perfil==='convidado'?'convidado@example.test':'dono@example.test'};
   const mock={
     perfil,empresas,rows,convites,empresa1,empresa2,uid,
     get conviteAceito(){return conviteAceito},
+    revogar(){revogado=true},rebaixar(){limitado=true},
     async rpc(name,p={}){
-      if(name==='minhas_empresas')return result((perfil==='convidado'&&!conviteAceito?[]:perfil==='duas'?empresas:[empresas[0]]).map(x=>membro(x.id)));
+      if(name==='minhas_empresas')return result((revogado||perfil==='convidado'&&!conviteAceito?[]:perfil==='duas'?empresas:[empresas[0]]).map(x=>membro(x.id)));
       if(name==='minha_empresa')return result(empresas.find(x=>x.id===p.p_conta));
-      if(name==='permissoes_membro')return result(perfil==='profissional'?permissoesProfissional:perfil==='convidado'?permissoesRecepcao:permissoesDono);
+      if(name==='permissoes_membro')return result(revogado?{}:limitado?{'agenda.ver_todas':true,'atendimentos.ver_todos':true,'clientes.ver':true}:perfil==='profissional'?permissoesProfissional:(perfil==='convidado'||perfil==='recepcao')?permissoesRecepcao:permissoesDono);
       if(name==='meus_convites_pendentes')return result(conviteAceito?[]:convites);
       if(name==='aceitar_convite'){
         if(perfil==='convidado'&&p.p_convite===conviteTeste){conviteAceito=true;sessionStorage.setItem('__fixture_convite_aceito','1');return result(empresa1)}
@@ -75,6 +82,8 @@
         const filtradas=rows.filter(x=>x.conta_id===p.p_conta&&x.atualizado_em>=p.p_cursor)
           .filter(x=>perfil!=='profissional'||['config','profissionais','clientes','servicos'].includes(x.colecao))
           .filter(x=>perfil!=='profissional'||x.colecao!=='profissionais'||x.id==='prof-ana')
+          .filter(x=>perfil!=='profissional'||x.colecao!=='servicos'||x.dados.profissionalId==='prof-ana')
+          .filter(x=>perfil!=='recepcao'||x.colecao!=='lancamentos')
           .map(x=>{
             if(perfil!=='profissional'||x.colecao!=='servicos')return x;
             const dados={...x.dados,itens:[],parcelas:[]};delete dados.total;delete dados.desconto;
@@ -88,6 +97,25 @@
         if(p.p_novo?!!anterior:!anterior||anterior.atualizado_em!==p.p_base_atualizado_em)
           return {data:null,error:{message:'STALE_WRITE'}};
         return result(upsert(p.p_conta,p.p_colecao,p.p_id,p.p_dados,p.p_excluido));
+      }
+      if(name==='registrar_recebimento_atendimento'){
+        if(perfil!=='recepcao'&&perfil!=='convidado')return {data:null,error:{message:'SEM_PERMISSAO'}};
+        const serv=rows.find(x=>x.conta_id===p.p_conta&&x.colecao==='servicos'&&x.id===p.p_servico_id);
+        if(!serv)return {data:null,error:{message:'ATENDIMENTO_NAO_ENCONTRADO'}};
+        let qtd=0;
+        const dados=structuredClone(serv.dados);
+        for(const parcela of dados.parcelas){
+          if(!(p.p_parcelas||[]).includes(parcela.id)||parcela.pago)continue;
+          qtd++;parcela.pago=true;parcela.pagoEm=p.p_data;parcela.formaPagamento=p.p_forma;
+          parcela.lancamentoId='receita-'+parcela.id;
+          upsert(p.p_conta,'lancamentos',parcela.lancamentoId,{
+            id:parcela.lancamentoId,tipo:'entrada',servicoId:p.p_servico_id,parcelaId:parcela.id,
+            descricao:'Recebimento: '+dados.titulo,valor:parcela.valor,data:p.p_data,formaPagamento:p.p_forma
+          });
+        }
+        if(qtd){if(dados.parcelas.every(x=>x.pago))dados.status='pago';
+          upsert(p.p_conta,'servicos',p.p_servico_id,dados);}
+        return result({registrados:qtd});
       }
       if(name==='listar_equipe')return result({membros:[{
         user_id:uid,email:user.email,papel:perfil==='profissional'?'profissional':'dono',
