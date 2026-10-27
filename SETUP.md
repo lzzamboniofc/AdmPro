@@ -86,3 +86,6 @@ Em ambiente de produção, configure monitoramento de erros, backups automático
 ## 6. Teste de aceite
 
 Siga `tests/supabase-manual.md`. Não liberar assinaturas reais antes de executar os testes contra um projeto Supabase de staging com pelo menos dois usuários e verificar políticas RLS. O instalador não aplica o esquema em um projeto remoto e não ativa cobrança automática.
+## Testes locais
+
+No pacote de integração disponível nesta conversa, execute `node tests/storage-sync-test.mjs`. Esse teste usa API simulada e **não substitui** testes RLS reais.
