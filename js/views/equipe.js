@@ -9,7 +9,12 @@ function profissionais(){return S.lista('profissionais').slice().sort((a,b)=>a.n
 function servicosCatalogo(){return S.lista('catalogo').filter(x=>x.ativo!==false&&x.categoria==='servico')}
 function listaProfissionais(){
  const itens=profissionais();
- return itens.length?itens.map(p=>'<article class="list-card"><div class="grow"><div class="inline-row"><span class="cor-profissional" style="background:'+esc(p.cor||'#0E5A6B')+'"></span><h3>'+esc(p.nome)+'</h3>'+(!p.ativo?'<span class="chip cancelado">Inativo</span>':'')+'</div><p class="item-meta">'+esc([p.funcao,p.especialidade,p.telefone].filter(Boolean).join(' · ')||'Profissional cadastrado')+'</p></div>'+(A.permissoes.pode('equipe.editar')?'<button type="button" class="btn secundario compacto" data-editar-prof="'+esc(p.id)+'">Editar</button>':'')+'</article>').join(''):UI.vazio('Nenhum profissional','Cadastre quem realiza atendimentos. O profissional não precisa ter login.','Adicionar profissional','novoProfissional');
+ return itens.length?itens.map(p=>{
+   const foto=/^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(p.fotoBase64||'')
+     ? '<img class="foto-profissional" src="'+esc(p.fotoBase64)+'" alt="">'
+     : '<span class="cor-profissional" style="background:'+esc(p.cor||'#0E5A6B')+'"></span>';
+   return '<article class="list-card"><div class="grow"><div class="inline-row">'+foto+'<h3>'+esc(p.nome)+'</h3>'+(!p.ativo?'<span class="chip cancelado">Inativo</span>':'')+'</div><p class="item-meta">'+esc([p.funcao,p.especialidade,p.telefone].filter(Boolean).join(' · ')||'Profissional cadastrado')+'</p></div>'+(A.permissoes.pode('equipe.editar')?'<button type="button" class="btn secundario compacto" data-editar-prof="'+esc(p.id)+'">Editar</button>':'')+'</article>';
+ }).join(''):UI.vazio('Nenhum profissional','Cadastre quem realiza atendimentos. O profissional não precisa ter login.',A.permissoes.pode('equipe.editar')?'Adicionar profissional':'',A.permissoes.pode('equipe.editar')?'novoProfissional':'');
 }
 function render(){
  return '<div class="page-heading"><div><h1>Equipe e Profissionais</h1><p class="muted">Agendas, jornadas e acessos da empresa.</p></div>'+(A.permissoes.pode('equipe.editar')?'<button class="btn" type="button" data-novo-prof>+ Profissional</button>':'')+'</div>'+
@@ -21,7 +26,7 @@ function defaultsHorario(p){
 }
 function lerFoto(file,atual){
  if(!file)return Promise.resolve(atual||'');
- if(!file.type.startsWith('image/'))return Promise.reject(Error('Selecione uma imagem válida.'));
+ if(!['image/png','image/jpeg','image/webp'].includes(file.type))return Promise.reject(Error('Use uma imagem PNG, JPEG ou WebP.'));
  if(file.size>700*1024)return Promise.reject(Error('A foto deve ter no máximo 700 KB.'));
  return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(Error('Não foi possível ler a foto.'));r.onload=()=>resolve(r.result);r.readAsDataURL(file)});
 }
@@ -100,6 +105,7 @@ async function carregarEquipe(root){
 }
 function bind(root){
  root.querySelector('[data-novo-prof]')?.addEventListener('click',()=>abrirProfissional());
+ root.querySelector('[data-action="novoProfissional"]')?.addEventListener('click',()=>abrirProfissional());
  root.querySelectorAll('[data-editar-prof]').forEach(b=>b.onclick=()=>abrirProfissional(b.dataset.editarProf));
  root.querySelector('[data-convidar]')?.addEventListener('click',abrirConvite);
  carregarEquipe(root).catch(e=>UI.toast(e.message));
