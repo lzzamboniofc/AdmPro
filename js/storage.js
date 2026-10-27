@@ -104,10 +104,10 @@
     function gravar(chave, valor) {
         if (!COLECOES.includes(chave))
             throw Error('Coleção desconhecida.');
+        if (!contaAtual) throw Error('Faça login para salvar dados.');
+        validarEscrita(chave, valor); // preservar mensagem de limite/bloqueio
+        const anterior = obter(chave);
         try {
-            if (!contaAtual) throw Error('Faça login para salvar dados.');
-            validarEscrita(chave, valor);
-            const anterior = obter(chave);
             localStorage.setItem(chaveCache(chave), JSON.stringify(valor));
             registrarMudancas(chave, anterior, valor);
             return copiar(valor);
