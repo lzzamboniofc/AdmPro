@@ -428,7 +428,7 @@
         clientes:!!perms['clientes.editar'],
         catalogo:!!perms['catalogo.editar'],
         profissionais:!!perms['equipe.editar'],
-        lancamentos:!!perms['financeiro.editar']||!!perms['financeiro.receber'],
+        lancamentos:!!perms['financeiro.editar'],
         despesasFixas:!!perms['financeiro.editar'],
         movimentacoesEstoque:!!perms['estoque.editar'],
         servicos:!!perms['agenda.editar']
@@ -512,8 +512,8 @@
           movimentacoesEstoque:'estoque.editar'
         }[colecao];
         if(exigida&&!A.permissoes.pode(exigida))throw Error('Seu perfil não possui permissão para alterar estes dados.');
-        if(colecao==='lancamentos'&&!A.permissoes.pode('financeiro.editar')&&!A.permissoes.pode('financeiro.receber'))
-          throw Error('Seu perfil não possui permissão para registrar movimentações financeiras.');
+        if(colecao==='lancamentos'&&!A.permissoes.pode('financeiro.editar'))
+          throw Error('Recebimentos devem ser feitos pelas parcelas; seu perfil não pode criar lançamentos livres.');
         if(colecao==='servicos'&&!operacional&&!A.permissoes.pode('agenda.editar'))
           throw Error('Seu perfil não possui permissão para alterar atendimentos.');
       }
