@@ -416,13 +416,13 @@ begin
   end if;
   if new.colecao='servicos' and not new.excluido and coalesce(new.dados->>'status','')<>'cancelado' then
     v_prof:=nullif(new.dados->>'profissionalId','');
-    if v_prof is not null and (new.dados->>'data') ~ '^\\d{4}-\\d{2}-\\d{2}$'
-      and (new.dados->>'hora') ~ '^\\d{2}:\\d{2}$' then
+    if v_prof is not null and (new.dados->>'data') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+      and (new.dados->>'hora') ~ '^[0-9]{2}:[0-9]{2}$' then
       select coalesce((dados->>'atendimentoSimultaneo')::boolean,false) into v_simultaneo
       from public.dados where conta_id=new.conta_id and colecao='profissionais' and id=v_prof and not excluido;
       if not coalesce(v_simultaneo,false) then
         perform pg_advisory_xact_lock(hashtextextended(new.conta_id::text||':'||v_prof,0));
-        v_dur:=case when coalesce(new.dados->>'duracaoMin','') ~ '^\\d+$'
+        v_dur:=case when coalesce(new.dados->>'duracaoMin','') ~ '^[0-9]+$'
           then greatest(1,least(1440,(new.dados->>'duracaoMin')::integer)) else 60 end;
         v_inicio:=(new.dados->>'data')::date + (new.dados->>'hora')::time;
         v_fim:=v_inicio + v_dur*interval '1 minute';
@@ -430,10 +430,10 @@ begin
           select 1 from public.dados d
           where d.conta_id=new.conta_id and d.colecao='servicos' and not d.excluido and d.id<>new.id
             and coalesce(d.dados->>'status','')<>'cancelado' and nullif(d.dados->>'profissionalId','')=v_prof
-            and (d.dados->>'data') ~ '^\\d{4}-\\d{2}-\\d{2}$' and (d.dados->>'hora') ~ '^\\d{2}:\\d{2}$'
+            and (d.dados->>'data') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' and (d.dados->>'hora') ~ '^[0-9]{2}:[0-9]{2}$'
             and ((d.dados->>'data')::date + (d.dados->>'hora')::time) < v_fim
             and v_inicio < ((d.dados->>'data')::date + (d.dados->>'hora')::time
-              + (case when coalesce(d.dados->>'duracaoMin','') ~ '^\\d+$'
+              + (case when coalesce(d.dados->>'duracaoMin','') ~ '^[0-9]+$'
                  then greatest(1,least(1440,(d.dados->>'duracaoMin')::integer)) else 60 end)*interval '1 minute')
         ) then raise exception 'CONFLITO_PROFISSIONAL' using errcode='P0001'; end if;
       end if;
