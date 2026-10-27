@@ -2,7 +2,7 @@
 (function(A){
 'use strict';
 const cfg=A.supabaseConfig||{};
-let sb=null,usuario=null,conta=null,membro=null,vinculos=[],permissoes={},convites=[],pronto=false,booting=null,servicosMes=0;
+let sb=null,usuario=null,conta=null,membro=null,vinculos=[],permissoes={},convites=[],pronto=false,booting=null,servicosMes=0,revalidando=null;
 function client(){
   if(!sb){
     if(!cfg.url||!cfg.anonKey||!/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(cfg.url))throw Error('Configure js/config.js para o Supabase.');
@@ -52,6 +52,7 @@ async function selecionarConta(id,{sincronizar=true}={}){
   conta=v.conta;membro=v;permissoes={};
   A.storage.usarConta(conta.id,usuario.id,membro.papel==='dono');
   A.storage.definirContaPreferida(usuario.id,conta.id);
+  if(navigator.onLine===false)permissoes=v.permissoes_efetivas||{};
   if(navigator.onLine!==false){
     const rp=await client().rpc('permissoes_membro',{p_conta:conta.id});
     if(rp.error)throw rp.error;permissoes=rp.data||{};
@@ -119,6 +120,28 @@ async function aceitarConvite(id){
   return contaId;
 }
 async function trocarEmpresa(id){if(conta?.id===id)return conta;await A.storage.sincronizar().catch(()=>{});return selecionarConta(id);}
+async function revalidarAcesso(){
+  if(!usuario||navigator.onLine===false)return false;
+  if(revalidando)return revalidando;
+  revalidando=(async()=>{
+    const idAnterior=conta?.id,uid=usuario.id;
+    await carregarVinculos();
+    await carregarConvites();
+    if(idAnterior&&!vinculos.some(v=>v.conta_id===idAnterior&&v.ativo!==false)){
+      A.storage.limparCacheEmpresa(uid,idAnterior);
+      conta=null;membro=null;permissoes={};servicosMes=0;
+      if(vinculos.length)await selecionarConta(vinculos[0].conta_id,{sincronizar:false});
+      A.ui?.toast('Seu acesso à empresa anterior foi revogado. Os dados locais dessa empresa foram apagados.');
+      A.app?.refresh();
+      return !!conta;
+    }
+    if(idAnterior)await selecionarConta(idAnterior,{sincronizar:false});
+    else if(vinculos.length)await selecionarConta(vinculos[0].conta_id,{sincronizar:false});
+    if(conta)A.app?.refresh();
+    return !!conta;
+  })();
+  try{return await revalidando}finally{revalidando=null}
+}
 async function recuperar(email){ok(await client().auth.resetPasswordForEmail(email,{redirectTo:new URL('index.html?modo=recuperar',location.href).href}));}
 async function redefinir(senha){ok(await client().auth.updateUser({password:senha}));}
 async function sair(){
@@ -129,6 +152,6 @@ A.auth={
  get client(){return client();},get usuario(){return usuario;},get conta(){return conta;},get membro(){return membro;},
  get vinculos(){return vinculos;},get contas(){return vinculos.map(v=>v.conta).filter(Boolean);},get permissoes(){return permissoes;},
  get convites(){return convites;},get pronto(){return pronto;},get servicosMes(){return servicosMes;},
- boot,entrar,cadastrar,recuperar,redefinir,atualizarConta,selecionarConta:trocarEmpresa,aceitarConvite,carregarConvites,sair
+ boot,entrar,cadastrar,recuperar,redefinir,atualizarConta,revalidarAcesso,selecionarConta:trocarEmpresa,aceitarConvite,carregarConvites,sair
 };
 })(window.AdmPro=window.AdmPro||{});
