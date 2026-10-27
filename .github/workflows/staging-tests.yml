@@ -1,6 +1,8 @@
 name: AdmPro staging JS checks
 on:
   push:
+    branches: [feature/supabase-assinaturas-staging, feature/multiusuario-multiprofissional]
+  pull_request:
     branches: [feature/supabase-assinaturas-staging]
   workflow_dispatch:
 permissions:
@@ -16,5 +18,7 @@ jobs:
         run: node --check sw.js
       - name: Validate pinned official vendor checksum
         run: sha256sum -c js/vendor/supabase.js.sha256
+      - name: Regression tests for models and schedules
+        run: node --test tests/horarios.js
       - name: Exercise current storage adapter
         run: node tests/staging-storage.mjs
