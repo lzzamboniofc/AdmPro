@@ -1,9 +1,9 @@
 name: AdmPro staging JS checks
 on:
   push:
-    branches: [feature/supabase-assinaturas-staging, feature/multiusuario-multiprofissional]
+    branches: [main, feature/supabase-assinaturas-staging, feature/multiusuario-multiprofissional]
   pull_request:
-    branches: [feature/supabase-assinaturas-staging]
+    branches: [main, feature/supabase-assinaturas-staging]
   workflow_dispatch:
 permissions:
   contents: read

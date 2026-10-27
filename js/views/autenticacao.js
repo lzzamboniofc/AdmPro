@@ -11,7 +11,7 @@ function render(){
       (cadastro?campo('Nome do negócio','nome','text','autocomplete="organization" maxlength="150"'):'')+
       (nova?'':campo('E-mail','email','email','autocomplete="email"'))+
       (esqueci?'':campo('Senha','senha','password','minlength="8" autocomplete="'+(cadastro||nova?'new-password':'current-password')+'"'))+
-      (cadastro?'<label class="auth-aceite"><input type="checkbox" name="aceite" required> Li e aceito os <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</label>':'')+
+      (cadastro?'<label class="auth-aceite"><input type="checkbox" name="aceite" required><span>Li e aceito os <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</span></label>':'')+
       '<p id="auth-erro" class="pin-erro" role="alert">'+U.escapar(mensagem||A.erroLogin||'')+'</p><button class="btn" type="submit">'+
       (nova?'Atualizar senha':cadastro?'Cadastrar':esqueci?'Enviar link':'Entrar')+'</button></form>'+
       '<div class="auth-links"><button type="button" data-auth="entrar">Entrar</button><button type="button" data-auth="cadastro">Criar conta</button><button type="button" data-auth="esqueci">Esqueci a senha</button></div>')+'</section>';
