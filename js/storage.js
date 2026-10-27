@@ -387,6 +387,14 @@
       if(!perms['equipe.ver'])remover('profissionais');
       if(!perms['clientes.ver'])remover('clientes');
       if(!perms['agenda.ver_todas']&&!perms['atendimentos.ver_todos'])remover('servicos');
+      if(!perms['config.editar']){
+        const cfg=obter('config');
+        if(cfg){
+          const seguro={...cfg};
+          delete seguro.metaMensal;delete seguro.reciboSequencia;
+          localStorage.setItem(chaveCache('config'),JSON.stringify(seguro));
+        }
+      }
       const podeEscrever={
         config:!!perms['config.editar'],
         clientes:!!perms['clientes.editar'],
@@ -397,7 +405,11 @@
         movimentacoesEstoque:!!perms['estoque.editar'],
         servicos:!!perms['agenda.editar']
       };
-      const atual=fila(),filtrada=atual.filter(x=>podeEscrever[x.colecao]!==false);
+      const atual=fila(),filtrada=atual.filter(x=>{
+        if(x.colecao==='servicos'&&!perms['agenda.editar'])
+          return !!perms['atendimentos.atualizar_proprios']&&x.operacao==='servico_operacional';
+        return podeEscrever[x.colecao]!==false;
+      });
       if(filtrada.length!==atual.length)salvarJSON(filaKey(),filtrada);
       atualizarIndicador();
     }
@@ -415,6 +427,22 @@
       const atual=new Map(nova.map(v=>[v.id,v]));
       const pend=new Map(fila().map(v=>[v.colecao+':'+v.id,v]));
       const marcas=carregarJSON(marcasKey(),{});
+      const operacional=colecao==='servicos'&&!A.permissoes?.pode?.('agenda.editar')&&A.permissoes?.pode?.('atendimentos.atualizar_proprios');
+      if(operacional){
+        for(const [id,item] of atual){
+          const anteriorItem=prev.get(id);
+          if(!anteriorItem||JSON.stringify(anteriorItem)===JSON.stringify(item))continue;
+          const k=colecao+':'+id,anteriorFila=pend.get(k),statusSeq=Array.isArray(anteriorFila?.status_seq)?[...anteriorFila.status_seq]:[];
+          if(anteriorItem.status!==item.status&&statusSeq.at(-1)!==item.status)statusSeq.push(item.status);
+          const lembrete=!!anteriorFila?.lembrete||(!anteriorItem.lembreteEnviadoEm&&!!item.lembreteEnviadoEm);
+          pend.set(k,{operacao:'servico_operacional',colecao,id,status_seq:statusSeq,lembrete,
+            base_atualizado_em:anteriorFila?.base_atualizado_em??marcas[k]??null,
+            atualizado_em:novaData(),novoRegistro:false});
+        }
+        salvarJSON(filaKey(),[...pend.values()]);
+        atualizarIndicador();if(navigator.onLine!==false)agendarSync();
+        return;
+      }
       for(const [id] of prev)if(!atual.has(id)){
         const k=colecao+':'+id,anterior=pend.get(k);
         if(anterior?.novoRegistro){pend.delete(k);continue}
@@ -434,6 +462,21 @@
     function validarEscrita(colecao,novo){
       if(!contaAtual||aplicandoRemoto)return;
       if(A.auth?.conta?.status_assinatura==='bloqueada')throw Error('CONTA_BLOQUEADA: somente leitura. Faça backup ou regularize.');
+      const operacional=colecao==='servicos'&&!A.permissoes?.pode?.('agenda.editar')&&A.permissoes?.pode?.('atendimentos.atualizar_proprios');
+      if(operacional){
+        if(!Array.isArray(novo))throw Error('Alteração operacional inválida.');
+        const antes=lista('servicos'),mapAntes=new Map(antes.map(x=>[x.id,x])),mapNovo=new Map(novo.map(x=>[x.id,x]));
+        if(antes.length!==novo.length||antes.some(x=>!mapNovo.has(x.id)))throw Error('Seu perfil não pode criar ou excluir atendimentos.');
+        const prof=A.auth?.membro?.profissional_id;
+        for(const item of novo){
+          const old=mapAntes.get(item.id);if(!old)throw Error('Seu perfil não pode criar atendimentos.');
+          if(old.profissionalId!==prof||item.profissionalId!==prof)throw Error('Seu perfil só pode atualizar os próprios atendimentos.');
+          if(!['orcamento','agendado','andamento','concluido','pago','cancelado'].includes(item.status))throw Error('Status inválido.');
+          const limpa=x=>{const v=copiar(x);delete v.status;delete v.historico;delete v.lembreteEnviadoEm;return v};
+          if(JSON.stringify(limpa(old))!==JSON.stringify(limpa(item)))
+            throw Error('Seu perfil só pode atualizar o status e o lembrete dos próprios atendimentos.');
+        }
+      }
       const plano=A.auth?.conta?.planos||{};
       if(colecao==='clientes'&&Array.isArray(novo)&&plano.limite_clientes!=null&&novo.length>plano.limite_clientes){
         A.ui?.modal('Limite de clientes','<p>Seu plano permite até '+plano.limite_clientes+' clientes.</p><a class="btn" href="#/assinatura">Assinar o Pro</a>');
@@ -460,10 +503,35 @@
       try{
         for(const item of fila()){
           if(cid!==contaAtual)return;
-          const {data,error}=await client.rpc('salvar_dado_otimista',{
-            p_conta:cid,p_colecao:item.colecao,p_id:item.id,p_dados:item.dados,
-            p_excluido:!!item.excluido,p_base_atualizado_em:item.base_atualizado_em||null,p_novo:!!item.novoRegistro
-          });
+          let data=null,error=null;
+          if(item.operacao==='servico_operacional'){
+            let base=item.base_atualizado_em||null,seq=[...(item.status_seq||[])],lembrar=!!item.lembrete;
+            if(!seq.length&&!lembrar){
+              salvarJSON(filaKey(),fila().filter(v=>!(v.colecao===item.colecao&&v.id===item.id&&v.atualizado_em===item.atualizado_em)));
+              continue;
+            }
+            while(seq.length||lembrar){
+              const status=seq.length?seq.shift():null,lembrarAgora=!seq.length&&lembrar;
+              const resp=await client.rpc('salvar_atendimento_operacional',{
+                p_conta:cid,p_id:item.id,p_status:status,p_lembrete:lembrarAgora,p_base_atualizado_em:base
+              });
+              if(resp.error){error=resp.error;break}
+              base=resp.data;data=resp.data;if(lembrarAgora)lembrar=false;
+              const q=fila(),idx=q.findIndex(v=>v.colecao===item.colecao&&v.id===item.id);
+              if(idx>=0){
+                let atualSeq=Array.isArray(q[idx].status_seq)?[...q[idx].status_seq]:[];
+                if(status!==null&&atualSeq[0]===status)atualSeq.shift();
+                q[idx]={...q[idx],base_atualizado_em:base,status_seq:atualSeq,lembrete:lembrarAgora?false:!!q[idx].lembrete};
+                salvarJSON(filaKey(),q);
+              }
+            }
+          }else{
+            const resp=await client.rpc('salvar_dado_otimista',{
+              p_conta:cid,p_colecao:item.colecao,p_id:item.id,p_dados:item.dados,
+              p_excluido:!!item.excluido,p_base_atualizado_em:item.base_atualizado_em||null,p_novo:!!item.novoRegistro
+            });
+            data=resp.data;error=resp.error;
+          }
           if(error){
             if(/STALE_WRITE/i.test(error.message)){
               salvarJSON(filaKey(),fila().filter(v=>v.colecao!==item.colecao||v.id!==item.id));
@@ -476,20 +544,19 @@
             break;
           }
           const marcas=carregarJSON(marcasKey(),{});marcas[item.colecao+':'+item.id]=data;salvarJSON(marcasKey(),marcas);
-          salvarJSON(filaKey(),fila().filter(v=>!(v.colecao===item.colecao&&v.id===item.id&&v.atualizado_em===item.atualizado_em)));
+          salvarJSON(filaKey(),fila().filter(v=>!(v.colecao===item.colecao&&v.id===item.id)));
         }
         if(cid===contaAtual){await buscarMudancas();await A.auth.atualizarConta();}
-      }finally{sincronizando=false;atualizarIndicador()}
+      }finally{sincronizando=false;atualizarIndicador();if(fila().length&&navigator.onLine!==false)agendarSync()}
     }
     async function buscarMudancas(){
       if(!contaAtual)return;
       const cid=contaAtual,cursor=localStorage.getItem(cursorKey())||'1970-01-01T00:00:00.000Z';
       let offset=0,maior=cursor;
       while(true){
-        const {data,error}=await A.auth.client.from('dados').select('id,colecao,dados,excluido,atualizado_em')
-          .eq('conta_id',cid).gte('atualizado_em',cursor)
-          .order('atualizado_em',{ascending:true}).order('id',{ascending:true})
-          .range(offset,offset+499);
+        const {data,error}=await A.auth.client.rpc('sincronizar_dados',{
+          p_conta:cid,p_cursor:cursor,p_offset:offset,p_limite:500
+        });
         if(error)throw error;
         if(cid!==contaAtual)return;
         if(!data?.length)break;
