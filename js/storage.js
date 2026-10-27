@@ -3,6 +3,8 @@
     'use strict';
     const U = A.utils, R = A.regras, PREFIXO = 'admpro_', COLECOES = ['config', 'clientes', 'catalogo', 'servicos', 'lancamentos', 'profissionais', 'despesasFixas', 'movimentacoesEstoque'];
     const copiar = v => JSON.parse(JSON.stringify(v));
+    let contaAtual = null, aplicandoRemoto = false;
+    const chaveCache = k => PREFIXO + (contaAtual ? contaAtual + '_' : '') + k;
     const VERSAO_DADOS = 3;
     const problemas = new Set();
     const vazio = chave => chave === 'config' ? null : [];
@@ -12,9 +14,9 @@
     const chaveSessao = PREFIXO + 'sessao';
     const chaveTentativas = PREFIXO + 'tentativasPin';
     const chaveBloqueio = PREFIXO + 'bloqueioPin';
-    function sessaoLer(chave) { try { return sessionStorage.getItem(chave); } catch (_) { return null; } }
-    function sessaoGravar(chave, valor) { try { sessionStorage.setItem(chave, valor); } catch (_) { /* Navegador restrito: não mantém sessão. */ } }
-    function sessaoRemover(chave) { try { sessionStorage.removeItem(chave); } catch (_) { /* Sessão já indisponível. */ } }
+    function sessaoLer(chave) { try { return sessionStorage.getItem(chave + ':' + (contaAtual || 'sem-conta')); } catch (_) { return null; } }
+    function sessaoGravar(chave, valor) { try { sessionStorage.setItem(chave + ':' + (contaAtual || 'sem-conta'), valor); } catch (_) { /* Navegador restrito: não mantém sessão. */ } }
+    function sessaoRemover(chave) { try { sessionStorage.removeItem(chave + ':' + (contaAtual || 'sem-conta')); } catch (_) { /* Sessão já indisponível. */ } }
     function fnv(texto) {
         let a = 2166136261, b = 2166136261;
         for (let i = 0; i < texto.length; i++) {
@@ -85,7 +87,8 @@
         if (!COLECOES.includes(chave))
             throw Error('Coleção desconhecida.');
         try {
-            const bruto = localStorage.getItem(PREFIXO + chave);
+            if (!contaAtual) return vazio(chave);
+            const bruto = localStorage.getItem(chaveCache(chave));
             if (!bruto) return vazio(chave);
             const dados = JSON.parse(bruto);
             if (chave === 'config' && (!dados || typeof dados !== 'object' || Array.isArray(dados))) throw Error('Configuração inválida');
@@ -102,7 +105,11 @@
         if (!COLECOES.includes(chave))
             throw Error('Coleção desconhecida.');
         try {
-            localStorage.setItem(PREFIXO + chave, JSON.stringify(valor));
+            if (!contaAtual) throw Error('Faça login para salvar dados.');
+            validarEscrita(chave, valor);
+            const anterior = obter(chave);
+            localStorage.setItem(chaveCache(chave), JSON.stringify(valor));
+            registrarMudancas(chave, anterior, valor);
             return copiar(valor);
         }
         catch (e) {
@@ -168,7 +175,16 @@
         catch (_) { /* Erro original será exibido. */ } });
         throw e;
     } }
-    function limpar() { COLECOES.forEach(k => localStorage.removeItem(PREFIXO + k)); problemas.clear(); encerrarSessao(); sessaoRemover(chaveTentativas); sessaoRemover(chaveBloqueio); }
+    function limpar() {
+        if (!contaAtual) return;
+        COLECOES.forEach(k => {
+          const antes=obter(k);
+          registrarMudancas(k,antes,k==='config'?null:[]);
+          localStorage.removeItem(chaveCache(k));
+        });
+        problemas.clear();encerrarSessao();sessaoRemover(chaveTentativas);sessaoRemover(chaveBloqueio);
+        agendarSync();
+    }
     function exemplo(tipo) {
         const rapido = tipo === 'rapido';
         const nomes = rapido ? ['Ana Costa', 'Beatriz Santos', 'Carla Oliveira', 'Daniela Rocha', 'Elisa Martins'] : ['Carlos Almeida', 'Mariana Lopes', 'Rafael Souza', 'Fernanda Lima', 'Paulo Mendes'];
@@ -319,5 +335,219 @@
         if (!s) throw Error('Serviço não encontrado.');
         atualizar('servicos',id,{ lembreteEnviadoEm:U.dataHora() });
     }
-    A.storage = { obter, gravar, lista, porId, adicionar, atualizar, excluir, removerServico, exportar, validarBackup, importar, limpar, exemplo, problemas, migrarDados, hashPin, verificarPin, definirPin, sessaoAtiva, abrirSessao, encerrarSessao, bloqueioRestante, registrarErroPin, registrarPagamento, estornarPagamento, movimentarEstoque, sincronizarServico, consumirRecorrente, gerarDespesasFixas, numeroRecibo, registrarLembrete };
+
+    // Sincronização por conta e fila persistente: dados continuam acessíveis sem rede.
+    const filaKey=()=>chaveCache('_fila');
+    const cursorKey=()=>chaveCache('_cursor');
+    const marcasKey=()=>chaveCache('_marcas');
+    const fechadosKey=()=>chaveCache('_avisosFechados');
+    const carregarJSON=(k,def)=>{try{return JSON.parse(localStorage.getItem(k))??def}catch(_){return def}};
+    const salvarJSON=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+    let sincronizando=false,agendado=0,relogio=0,ultimoAcesso=0,falhaSync='',avisosAtivos=[];
+    function fila(){return contaAtual?carregarJSON(filaKey(),[]):[]}
+    function pendentes(){return fila().length}
+    function estadoSync(){
+      if(navigator.onLine===false)return 'Offline'+(pendentes()?' · '+pendentes()+' pendente(s)':'');
+      if(sincronizando)return 'Sincronizando…';
+      if(pendentes())return pendentes()+' alteração(ões) pendente(s)';
+      return falhaSync?'Erro de sincronização':'Sincronizado';
+    }
+    function atualizarIndicador(){const n=document.getElementById('indicador-sync');if(n){n.textContent=estadoSync();n.title=falhaSync||n.textContent}}
+    function usarConta(id){
+      if(!/^[a-f0-9-]{36}$/i.test(id||''))throw Error('Conta inválida');
+      if(contaAtual!==id){contaAtual=id;falhaSync='';avisosAtivos=[];ultimoAcesso=0}
+      atualizarIndicador();
+    }
+    function limparCacheConta(userId){
+      if(contaAtual){
+        const prefixo=PREFIXO+contaAtual+'_';
+        Object.keys(localStorage).filter(k=>k.startsWith(prefixo)).forEach(k=>localStorage.removeItem(k));
+      }
+      if(userId)localStorage.removeItem(PREFIXO+'usuario_'+userId);
+      encerrarSessao();contaAtual=null;falhaSync='';avisosAtivos=[];ultimoAcesso=0;
+      atualizarIndicador();
+    }
+    function novaData(){relogio=Math.max(Date.now(),relogio+1);return new Date(relogio).toISOString()}
+    function seguro(colecao,item){
+      const v=copiar(item);
+      if(colecao==='config'){delete v.pinHash;delete v.pinMetodo}
+      return v;
+    }
+    function registrarMudancas(colecao,antes,depois){
+      if(!contaAtual||aplicandoRemoto)return;
+      const antiga=colecao==='config'?(antes?[{...seguro(colecao,antes),id:'principal'}]:[]):antes||[];
+      const nova=colecao==='config'?(depois?[{...seguro(colecao,depois),id:'principal'}]:[]):depois||[];
+      const prev=new Map(antiga.map(v=>[v.id,v]));
+      const atual=new Map(nova.map(v=>[v.id,v]));
+      const pend=new Map(fila().map(v=>[v.colecao+':'+v.id,v]));
+      for(const [id] of prev)if(!atual.has(id))pend.set(colecao+':'+id,{colecao,id,excluido:true,dados:{},atualizado_em:novaData()});
+      for(const [id,item] of atual){
+        if(!prev.has(id)||JSON.stringify(prev.get(id))!==JSON.stringify(item)){
+          const anterior=pend.get(colecao+':'+id);
+          pend.set(colecao+':'+id,{colecao,id,dados:seguro(colecao,item),excluido:false,atualizado_em:novaData(),novoRegistro:!prev.has(id)||anterior?.novoRegistro===true});
+        }
+      }
+      salvarJSON(filaKey(),[...pend.values()]);
+      atualizarIndicador();if(navigator.onLine!==false)agendarSync();
+    }
+    function validarEscrita(colecao,novo){
+      if(!contaAtual||aplicandoRemoto)return;
+      if(A.auth?.conta?.status_assinatura==='bloqueada')throw Error('CONTA_BLOQUEADA: somente leitura. Faça backup ou regularize.');
+      const plano=A.auth?.conta?.planos||{};
+      if(colecao==='clientes'&&Array.isArray(novo)&&plano.limite_clientes!=null&&novo.length>plano.limite_clientes){
+        A.ui?.modal('Limite de clientes','<p>Seu plano permite até '+plano.limite_clientes+' clientes.</p><a class="btn" href="#/assinatura">Assinar o Pro</a>');
+        throw Error('LIMITE_CLIENTES');
+      }
+      if(colecao==='servicos'&&Array.isArray(novo)&&plano.limite_servicos_mes!=null){
+        const antes=new Set(lista('servicos').map(v=>v.id));
+        const criados=novo.filter(v=>!antes.has(v.id)).length;
+        const pend=fila().filter(v=>v.colecao==='servicos'&&!v.excluido&&v.novoRegistro).length;
+        if(criados&&criados+pend+(A.auth?.servicosMes||0)>plano.limite_servicos_mes){
+          A.ui?.modal('Limite mensal','<p>Seu plano permite '+plano.limite_servicos_mes+' serviços/mês.</p><a class="btn" href="#/assinatura">Assinar o Pro</a>');
+          throw Error('LIMITE_SERVICOS_MES');
+        }
+      }
+    }
+    function agendarSync(){
+      if(agendado||!contaAtual||navigator.onLine===false)return;
+      agendado=setTimeout(()=>{agendado=0;sincronizar().catch(e=>{falhaSync=e.message;atualizarIndicador()})},80);
+    }
+    async function sincronizar(){
+      if(!contaAtual||!A.auth?.usuario||sincronizando||navigator.onLine===false)return;
+      const cid=contaAtual,client=A.auth.client;
+      sincronizando=true;falhaSync='';atualizarIndicador();
+      try{
+        for(const item of fila()){
+          if(cid!==contaAtual)return;
+          const payload={conta_id:cid,colecao:item.colecao,id:item.id,dados:item.dados,excluido:item.excluido,atualizado_em:item.atualizado_em};
+          const {error}=await client.from('dados').upsert(payload,{onConflict:'conta_id,colecao,id'});
+          if(error){
+            if(/STALE_WRITE/i.test(error.message)){salvarJSON(filaKey(),fila().filter(v=>v.colecao!==item.colecao||v.id!==item.id));continue;}
+            falhaSync=error.message;
+            if(/LIMITE_/i.test(error.message))A.ui?.modal('Limite do plano','<p>'+U.escapar(error.message)+'</p><a class="btn" href="#/assinatura">Assinar o Pro</a>');
+            break;
+          }
+          salvarJSON(filaKey(),fila().filter(v=>!(v.colecao===item.colecao&&v.id===item.id&&v.atualizado_em===item.atualizado_em)));
+        }
+        if(cid===contaAtual){await buscarMudancas();await A.auth.atualizarConta();}
+      }finally{sincronizando=false;atualizarIndicador()}
+    }
+    async function buscarMudancas(){
+      if(!contaAtual)return;
+      const cid=contaAtual,cursor=localStorage.getItem(cursorKey())||'1970-01-01T00:00:00.000Z';
+      let offset=0,maior=cursor;
+      while(true){
+        const {data,error}=await A.auth.client.from('dados').select('id,colecao,dados,excluido,atualizado_em')
+          .eq('conta_id',cid).gte('atualizado_em',cursor)
+          .order('atualizado_em',{ascending:true}).order('id',{ascending:true})
+          .range(offset,offset+499);
+        if(error)throw error;
+        if(cid!==contaAtual)return;
+        if(!data?.length)break;
+        integrarRemotos(data);
+        maior=data.reduce((acc,x)=>x.atualizado_em>acc?x.atualizado_em:acc,maior);
+        offset+=data.length;
+        if(data.length<500)break;
+      }
+      localStorage.setItem(cursorKey(),maior);
+      if(A.app?.refresh&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))A.app.refresh();
+    }
+    function integrarRemotos(rows){
+      const pend=new Set(fila().map(v=>v.colecao+':'+v.id));
+      const marcas=carregarJSON(marcasKey(),{}),modificadas=new Map();
+      for(const row of rows){
+        const k=row.colecao+':'+row.id;
+        if(pend.has(k)||(marcas[k]&&marcas[k]>row.atualizado_em))continue;
+        if(!modificadas.has(row.colecao))modificadas.set(row.colecao,obter(row.colecao));
+        if(row.colecao==='config'){
+          const anterior=modificadas.get('config')||{};
+          modificadas.set('config',row.excluido?null:{...row.dados,...(anterior.pinHash?{pinHash:anterior.pinHash,pinMetodo:anterior.pinMetodo}:{})});
+        }else{
+          const arr=modificadas.get(row.colecao)||[];
+          const i=arr.findIndex(x=>x.id===row.id);
+          if(row.excluido){if(i>=0)arr.splice(i,1)}
+          else if(i>=0)arr[i]=row.dados;
+          else arr.push(row.dados);
+        }
+        marcas[k]=row.atualizado_em;
+      }
+      aplicandoRemoto=true;
+      try{
+        for(const [col,val] of modificadas){
+          if(val===null)localStorage.removeItem(chaveCache(col));
+          else localStorage.setItem(chaveCache(col),JSON.stringify(val));
+        }
+        salvarJSON(marcasKey(),marcas);
+      }finally{aplicandoRemoto=false}
+    }
+    async function registrarAcesso(){
+      if(!contaAtual||navigator.onLine===false)return;
+      const anterior=Math.max(ultimoAcesso,Number(localStorage.getItem(chaveCache('_ultimoAcesso'))||0));
+      if(Date.now()-anterior<1800000)return;
+      const {error}=await A.auth.client.rpc('registrar_acesso',{p_versao_app:A.supabaseConfig.versaoApp||''});
+      if(error)throw error;
+      ultimoAcesso=Date.now();localStorage.setItem(chaveCache('_ultimoAcesso'),String(ultimoAcesso));
+    }
+    async function dadosAssinatura(){
+      if(!A.auth.conta)throw Error('Faça login.');
+      const c=A.auth.conta,sb=A.auth.client;
+      const rs=await Promise.all([
+        sb.from('planos').select('*').eq('id',c.plano_id).single(),
+        sb.from('pagamentos').select('*').eq('conta_id',c.id).order('criado_em',{ascending:false}),
+        sb.from('config_sistema').select('chave,valor'),
+        sb.from('planos').select('*').eq('nome','Pro').eq('ativo',true).maybeSingle()
+      ]);
+      for(const r of rs)if(r.error)throw r.error;
+      return {conta:c,plano:rs[0].data,pagamentos:rs[1].data||[],config:Object.fromEntries((rs[2].data||[]).map(v=>[v.chave,v.valor])),pro:rs[3].data};
+    }
+    async function carregarAvisos(){
+      if(!contaAtual||navigator.onLine===false)return avisosAtivos;
+      const id=contaAtual;
+      const {data,error}=await A.auth.client.from('avisos').select('id,titulo,mensagem,tipo').order('inicio',{ascending:false});
+      if(error)throw error;
+      if(id!==contaAtual)return [];
+      const fechados=new Set(carregarJSON(fechadosKey(),[]));
+      avisosAtivos=(data||[]).filter(v=>!fechados.has(v.id));
+      return avisosAtivos;
+    }
+    function avisosHTML(){return avisosAtivos.map(a=>'<aside class="admpro-aviso '+(a.tipo==='alerta'?'alerta':'')+'" role="status"><div><strong>'+U.escapar(a.titulo)+'</strong><p>'+U.escapar(a.mensagem)+'</p></div><button class="icon-button" data-fechar-aviso="'+U.escapar(a.id)+'" aria-label="Fechar aviso">×</button></aside>').join('')}
+    function bindAvisos(root){root.querySelectorAll('[data-fechar-aviso]').forEach(btn=>btn.onclick=()=>{salvarJSON(fechadosKey(),[...new Set([...carregarJSON(fechadosKey(),[]),btn.dataset.fecharAviso])]);avisosAtivos=avisosAtivos.filter(v=>v.id!==btn.dataset.fecharAviso);btn.closest('.admpro-aviso').remove()})}
+    async function enviarFeedback(tipo,mensagem){
+      if(!['duvida','problema','sugestao','pagamento'].includes(tipo))throw Error('Tipo inválido.');
+      if(!contaAtual)throw Error('Faça login.');
+      const {error}=await A.auth.client.from('feedbacks').insert({conta_id:contaAtual,tipo,mensagem});
+      if(error)throw error;
+    }
+    async function listarFeedbacks(){
+      if(!contaAtual)throw Error('Faça login.');
+      const {data,error}=await A.auth.client.from('feedbacks').select('*').eq('conta_id',contaAtual).order('criado_em',{ascending:false});
+      if(error)throw error;
+      return data||[];
+    }
+    async function atualizarDadosConta(obj){
+      const permitido=new Set(['nome_negocio','modelo_negocio','tipo_negocio','telefone','cidade','uf']);
+      const dados=Object.fromEntries(Object.entries(obj).filter(([k])=>permitido.has(k)));
+      if(!contaAtual||!Object.keys(dados).length)return;
+      const {error}=await A.auth.client.from('contas').update(dados).eq('id',contaAtual);
+      if(error)throw error;
+      await A.auth.atualizarConta();
+    }
+    function possuiLegado(){return !!localStorage.getItem(PREFIXO+'config')}
+    function importarLegado(){
+      if(!contaAtual||obter('config'))throw Error('A conta já tem dados ou não está autenticada.');
+      const obj={};
+      for(const col of COLECOES){
+        const raw=localStorage.getItem(PREFIXO+col);
+        if(!raw)continue;
+        const v=JSON.parse(raw);
+        if(col==='config'?!v||typeof v!=='object':!Array.isArray(v))throw Error('Dados antigos inválidos.');
+        obj[col]=v;
+      }
+      for(const col of COLECOES)if(obj[col])gravar(col,obj[col]);
+    }
+    function guardarContaUsuario(userId,c){salvarJSON(PREFIXO+'usuario_'+userId,c)}
+    function contaCacheUsuario(userId){return carregarJSON(PREFIXO+'usuario_'+userId,null)}
+    A.storage = { obter, gravar, lista, porId, adicionar, atualizar, excluir, removerServico, exportar, validarBackup, importar, limpar, exemplo, problemas, migrarDados, hashPin, verificarPin, definirPin, sessaoAtiva, abrirSessao, encerrarSessao, bloqueioRestante, registrarErroPin, registrarPagamento, estornarPagamento, movimentarEstoque, sincronizarServico, consumirRecorrente, gerarDespesasFixas, numeroRecibo, registrarLembrete, usarConta, limparCacheConta, pendentes, estadoSync, sincronizar, registrarAcesso, dadosAssinatura, carregarAvisos, avisosHTML, bindAvisos, enviarFeedback, listarFeedbacks, atualizarDadosConta, possuiLegado, importarLegado, guardarContaUsuario, contaCacheUsuario };
 })(window.AdmPro = window.AdmPro || {});
+
+/* ADMPRO-SUPABASE-INTEGRADO */
