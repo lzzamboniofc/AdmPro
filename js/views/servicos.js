@@ -35,7 +35,7 @@
         if(!R.horarioDisponivel(base,data,hora,duracao))return false;
         if(!p)return true;
         const inicio=U.horaMinutos(hora),fim=inicio+Number(duracao||0);
-        return !(p.ausencias||[]).some(a=>a.data===data&&inicio<U.horaMinutos(a.fim||'23:59')&&U.horaMinutos(a.inicio||'00:00')<fim);
+        return !(p.ausencias||[]).some(a=>{const di=a.dataInicio||a.data,df=a.dataFim||a.data||di;return di&&data>=di&&data<=df&&inicio<U.horaMinutos(a.fim||'23:59')&&U.horaMinutos(a.inicio||'00:00')<fim});
     }
     function abrirForm(id, preencher = {}) {
         const antigo = id ? S.porId('servicos', id) : null;
