@@ -20,3 +20,15 @@ As dez tabelas possuem RLS ativo. Os seeds Gratuito e Pro estão presentes. Pre�
 **Pendências:** testes Auth reais com confirmação de e-mail, configuração de URL de redirecionamento e SMTP, biblioteca UMD local, integração completa do front-end na branch, teste offline no navegador e revisão jurídica. O preço do Pro deve ser definido antes de vender assinaturas. Não executar novamente o schema completo neste projeto já migrado.
 
 **Avisos de segurança:** o Supabase aponta funções SECURITY DEFINER autenticadas (projetadas para operar na própria conta); são avisos a revisar continuamente. Os testes transacionais não substituem uma auditoria de segurança ou testes de ponta a ponta.
+
+## Integração do front-end (27/10/2026)
+
+Arquivos de interface e armazenamento aplicados na branch `feature/supabase-assinaturas-staging`: `js/storage.js`, `js/app.js`, `js/auth.js`, `js/config.js`, `js/views/autenticacao.js`, `js/views/assinatura.js`, `js/views/suporte.js`, `js/views/config.js`, `js/views/onboarding.js`, `index.html`, `css/style.css`, `sw.js`.
+
+Biblioteca oficial vendorizada em `js/vendor/supabase.js` versão 2.117.3, obtida pelo workflow `.github/workflows/vendor-supabase.yml`; checksum em `js/vendor/supabase.js.sha256`.
+
+Workflow `.github/workflows/staging-tests.yml`: sucesso em sintaxe, integridade de biblioteca e cenário simulado de sincronização usando o `storage.js` real. Testes transacionais RLS foram executados anteriormente no banco e revertidos.
+
+**Pendências de homologação:** validar cadastro/recuperação de senha por e-mail com redirect/SMTP, testar navegação e PWA em navegador real, testar sincronização simultânea em múltiplos dispositivos, revisar resolução de conflitos e revisar segurança/LGPD. Não liberar a venda de assinaturas antes desses testes.
+
+**Hospedagem:** tentativa de criar o projeto Vercel separado `admpro-staging-web` retornou HTTP 403 (sem autorização para criar projeto). Nenhuma versão nova foi publicada nem alterada em produção. É necessário alguém com permissão na equipe Vercel habilitar a criação de projeto ou disponibilizar um projeto de staging já existente.
