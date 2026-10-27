@@ -395,8 +395,8 @@
     function aplicarEscopo(perms={},membro={}){
       if(!contaAtual||navigator.onLine===false)return;
       const marca=chaveCache('_permissoesEfetivas');
-      const atual=JSON.stringify(perms),anterior=localStorage.getItem(marca);
-      if(anterior!==atual){
+      const escopoAtual=JSON.stringify(perms),anterior=localStorage.getItem(marca);
+      if(anterior!==escopoAtual){
         // Nunca reutiliza dados completos após a redução de acesso.
         // PIN e nome local permanecem; os demais dados serão relidos já filtrados pela API.
         for(const col of COLECOES.filter(x=>x!=='config'))
@@ -406,7 +406,7 @@
         localStorage.removeItem(marcasKey());
         localStorage.setItem(cursorKey(),'1970-01-01T00:00:00.000Z');
         if(pend)A.ui?.toast('As permissões mudaram: alterações locais não sincronizadas foram descartadas.');
-        localStorage.setItem(marca,atual);
+        localStorage.setItem(marca,escopoAtual);
       }
       const remover=col=>localStorage.removeItem(chaveCache(col));
       if(!perms['financeiro.ver']){remover('lancamentos');remover('despesasFixas')}
