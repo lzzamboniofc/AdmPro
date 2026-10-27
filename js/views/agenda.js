@@ -23,7 +23,7 @@ function escala(data,pid){
 function bloqueado(pid,data,hora,dur=30){
  const p=pid?S.porId('profissionais',pid):null;if(!p)return false;
  const ini=U.horaMinutos(hora),fim=ini+dur;
- return (p.ausencias||[]).some(a=>a.data===data&&ini<U.horaMinutos(a.fim||'23:59')&&U.horaMinutos(a.inicio||'00:00')<fim);
+ return (p.ausencias||[]).some(a=>{const di=a.dataInicio||a.data,df=a.dataFim||a.data||di;return di&&data>=di&&data<=df&&ini<U.horaMinutos(a.fim||'23:59')&&U.horaMinutos(a.inicio||'00:00')<fim});
 }
 const turnoLabel=t=>t.map(x=>x.inicio+'–'+x.fim).join(' · ');
 function telaIndividual(pid){
