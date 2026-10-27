@@ -1,0 +1,21 @@
+name: AdmPro multi-user browser smoke
+on:
+  push:
+    branches: [feature/multiusuario-multiprofissional]
+  pull_request:
+    branches: [feature/supabase-assinaturas-staging]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install browser-only test dependency
+        run: npm install --no-save --no-package-lock playwright@1.56.1
+      - name: Install Chromium for the test runner
+        run: npx playwright install --with-deps chromium
+      - name: Run desktop and mobile end-to-end smoke tests
+        run: node tests/browser-multiusuario.mjs
