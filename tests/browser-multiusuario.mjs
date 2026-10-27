@@ -134,6 +134,8 @@ try{
       await page.locator('[data-empresa="10000000-0000-4000-8000-000000000002"]').click();
       // A proteção PIN é independente por empresa neste navegador: no primeiro
       // acesso à segunda empresa, configuramos o PIN antes de seguir.
+      await page.waitForFunction(()=>!!document.querySelector('#form-criar-pin')||
+        !!document.querySelector('.topbar-nome')?.textContent?.includes('Estúdio Secundário'),null,{timeout:12000});
       if(await page.locator('#form-criar-pin').isVisible()){
         await page.locator('#form-criar-pin [name="pin"]').fill('5678');
         await page.locator('#form-criar-pin [name="confirmacao"]').fill('5678');
