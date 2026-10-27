@@ -13,12 +13,8 @@ function client(){
 }
 function ok(r){if(r.error)throw r.error;return r.data;}
 async function carregarVinculos(){
-  const rel=ok(await client().from('membros').select('conta_id,papel,profissional_id,permissoes,ativo,criado_em').eq('user_id',usuario.id).eq('ativo',true));
-  const ids=(rel||[]).map(x=>x.conta_id);
-  let contas=[];
-  if(ids.length)contas=ok(await client().from('contas').select('*,planos(*)').in('id',ids));
-  const mapa=new Map((contas||[]).map(c=>[c.id,c]));
-  vinculos=(rel||[]).map(v=>({...v,conta:mapa.get(v.conta_id)})).filter(v=>v.conta);
+  const rel=ok(await client().rpc('minhas_empresas'));
+  vinculos=(rel||[]).filter(v=>v?.conta_id&&v?.conta).map(v=>({...v,conta:v.conta}));
   A.storage.guardarVinculosUsuario(usuario.id,vinculos);
   return vinculos;
 }
@@ -39,13 +35,15 @@ async function aceitarConviteDaUrl(){
 }
 async function atualizarConta(){
   if(!conta||navigator.onLine===false)return conta;
-  const c=ok(await client().from('contas').select('*,planos(*)').eq('id',conta.id).single());
+  const c=ok(await client().rpc('minha_empresa',{p_conta:conta.id}));
   conta=c;
   const i=vinculos.findIndex(v=>v.conta_id===c.id);if(i>=0)vinculos[i]={...vinculos[i],conta:c};
   A.storage.guardarContaUsuario(usuario.id,c);A.storage.guardarVinculosUsuario(usuario.id,vinculos);
-  const inicio=new Date();inicio.setDate(1);
-  const result=await client().from('uso_diario').select('servicos_criados').eq('conta_id',c.id).gte('dia',inicio.toISOString().slice(0,10));
-  servicosMes=result.error?0:(result.data||[]).reduce((a,x)=>a+Number(x.servicos_criados||0),0);
+  if(A.permissoes?.pode?.('relatorios.operacionais')){
+    const inicio=new Date();inicio.setDate(1);
+    const result=await client().from('uso_diario').select('servicos_criados').eq('conta_id',c.id).gte('dia',inicio.toISOString().slice(0,10));
+    servicosMes=result.error?0:(result.data||[]).reduce((a,x)=>a+Number(x.servicos_criados||0),0);
+  }else servicosMes=0;
   return conta;
 }
 async function selecionarConta(id,{sincronizar=true}={}){
