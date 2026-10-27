@@ -214,7 +214,7 @@ try{
         window.AdmPro.ui.toastAcao('Atualização disponível','Atualizar',()=>{});
       });
       const contrast=(a,b)=>{
-        const rgb=s=>(s.match(/[\\d.]+/g)||[]).slice(0,3).map(Number);
+        const rgb=s=>(s.match(/[\d.]+/g)||[]).slice(0,3).map(Number);
         const lum=c=>{
           const q=rgb(c).map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);
           return .2126*q[0]+.7152*q[1]+.0722*q[2];
