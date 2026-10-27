@@ -107,17 +107,17 @@ Aplicar as migrations do diretório `supabase/migrations/` em ordem de nome, ap�
 
 Principais arquivos:
 
-1. `20261027_multiusuario_multiprofissional.sql`
-2. `20261027_multiusuario_indexes.sql`
-3. `20261027_multiusuario_membership_rls_fix.sql`
-4. `20261027_multiusuario_conflict_regex_fix.sql`
-5. `20261027_professional_availability_guard.sql`
-6. `20261027_optimistic_writes.sql`
-7. `20261027_professional_private_sync.sql`
-8. `20261027_future_plan_limits.sql`
-9. `20261027_professional_absence_ranges.sql`
-10. `20261027_professional_minimal_permissions.sql`
-11. `20261027_secure_company_profile.sql`
+1. `20261027180000_multiusuario_multiprofissional.sql`
+2. `20261027180100_multiusuario_indexes.sql`
+3. `20261027180200_multiusuario_membership_rls_fix.sql`
+4. `20261027180300_multiusuario_conflict_regex_fix.sql`
+5. `20261027180400_professional_availability_guard.sql`
+6. `20261027180500_optimistic_writes.sql`
+7. `20261027180600_professional_private_sync.sql`
+8. `20261027180700_future_plan_limits.sql`
+9. `20261027180800_professional_absence_ranges.sql`
+10. `20261027180900_professional_minimal_permissions.sql`
+11. `20261027181000_secure_company_profile.sql`
 
 Algumas migrations posteriores também consolidam correções feitas durante a validação no staging. Elas devem permanecer na sequência para que ambientes que já receberam uma versão anterior cheguem ao mesmo estado final.
 
