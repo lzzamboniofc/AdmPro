@@ -1,5 +1,8 @@
 # AdmPro — Preparação Supabase (versão de integração)
 
+> **Staging configurado (27/10/2026):** `admpro-staging` (`stvenawjeyyhpvwvpjkm`) já tem schema, RLS e cron. **Não reexecute** `schema.sql` nesse banco. Veja `docs/supabase-staging.md`. Os passos de criação e SQL a seguir valem para um projeto novo.
+
+
 > **NÃO PUBLICAR SEM SEGUIR TODAS AS ETAPAS.** O esquema e o código foram preparados para revisão/testes, mas dependem de um projeto Supabase real, configuração de preço Pix, da biblioteca UMD e dos testes manuais indicados. Termos/privacidade são rascunhos jurídicos. **Nunca** publique a chave `service_role`/secret.
 
 ## 1. Aplicar os arquivos à versão original
