@@ -450,7 +450,10 @@
         if(data.length<500)break;
       }
       localStorage.setItem(cursorKey(),maior);
-      if(A.app?.refresh&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))A.app.refresh();
+      if(A.app?.refresh&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)){
+        if(obter('config'))A.app.aplicarConfig?.();
+        A.app.refresh();
+      }
     }
     function integrarRemotos(rows){
       const pend=new Set(fila().map(v=>v.colecao+':'+v.id));
