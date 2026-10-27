@@ -9,14 +9,14 @@
     const somenteAtivos = () => S.lista('catalogo').filter(c => c.ativo);
     const opcoesPagamento = () => MEIOS.map(([value, label]) => ({ value, label }));
     function render() { return `<div class="page-heading"><div><h1>${A.perfil.plural}</h1><p class="muted">Orçamentos, compromissos e recebimentos.</p></div></div><div class="chips" aria-label="Filtrar por status">${['todos', ...STATUS].map(s => `<button type="button" class="chip filtro" data-filtro="${s}" aria-pressed="${filtro === s}">${s === 'todos' ? 'Todos' : UI.chip(s).replace(/<[^>]*>/g, '')}</button>`).join('')}</div><div class="field search-wrap"><label for="buscar-servicos">Buscar ${A.perfil.rotulo.toLowerCase()}</label><input id="buscar-servicos" placeholder="Título ou cliente" value="${U.escapar(busca)}"></div><div id="lista-servicos" class="stack">${listar()}</div>`; }
-    function listar() { const lista = S.lista('servicos').filter(s => (filtro === 'todos' || s.status === filtro) && (s.titulo + ' ' + (cliente(s.clienteId)?.nome || '')).toLocaleLowerCase('pt-BR').includes(busca.toLocaleLowerCase('pt-BR'))).sort((a, b) => b.data.localeCompare(a.data) || a.hora.localeCompare(b.hora)); return lista.length ? lista.map(s => UI.card(`<div class="list-card"><div class="grow"><h3>${U.escapar(s.titulo)}</h3><p class="item-meta">${U.escapar(cliente(s.clienteId)?.nome || 'Cliente')} · ${U.exibirData(s.data)} ${U.escapar(s.hora || '')}</p><p class="numero destaque" style="margin-top:8px">${U.dinheiro(s.total)}</p></div>${UI.chip(s.status)}</div>${s.recorrencia?.ativa ? '<span class="badge-sutil">↻ Recorrente</span>' : ''}<div class="actions"><button type="button" class="btn secundario compacto" data-abrir="${U.escapar(s.id)}">Detalhes</button>${s.status !== 'pago' && s.status !== 'cancelado' ? `<button type="button" class="btn compacto" data-avancar="${U.escapar(s.id)}">${A.perfil.botaoCard}</button>` : ''}</div>`)).join('') : UI.vazio('Nenhum registro encontrado', 'Cadastre um novo ' + A.perfil.rotulo.toLowerCase() + ' para começar.', 'Novo ' + A.perfil.rotulo.toLowerCase(), 'novoServico'); }
+    function listar() { const lista = S.lista('servicos').filter(s => (filtro === 'todos' || s.status === filtro) && (s.titulo + ' ' + (cliente(s.clienteId)?.nome || '')).toLocaleLowerCase('pt-BR').includes(busca.toLocaleLowerCase('pt-BR'))).sort((a, b) => b.data.localeCompare(a.data) || a.hora.localeCompare(b.hora)); return lista.length ? lista.map(s => UI.card(`<div class="list-card"><div class="grow"><h3>${U.escapar(s.titulo)}</h3><p class="item-meta">${U.escapar(cliente(s.clienteId)?.nome || 'Cliente')} · ${U.exibirData(s.data)} ${U.escapar(s.hora || '')}</p><p class="numero destaque" style="margin-top:8px">${U.dinheiro(s.total)}</p></div>${UI.chip(s.status)}</div>${s.recorrencia?.ativa ? '<span class="badge-sutil">↻ Recorrente</span>' : ''}<div class="actions"><button type="button" class="btn secundario compacto" data-abrir="${U.escapar(s.id)}">Detalhes</button>${s.status !== 'pago' && s.status !== 'cancelado' ? `<button type="button" class="btn compacto" data-avancar="${U.escapar(s.id)}">${A.perfil.botaoCard}</button>` : ''}</div>`)).join('') : (busca || filtro !== 'todos' ? UI.vazio('Nenhum resultado', 'Tente outro termo ou remova o filtro.', 'Limpar filtros', 'limparFiltros') : UI.vazio('Nenhum registro cadastrado', 'Cadastre um novo ' + A.perfil.rotulo.toLowerCase() + ' para começar.', 'Novo ' + A.perfil.rotulo.toLowerCase(), 'novoServico')); }
     function bind(root) { root.querySelector('#buscar-servicos').oninput = e => { busca = e.target.value; root.querySelector('#lista-servicos').innerHTML = listar(); }; root.addEventListener('click', e => { const f = e.target.closest('[data-filtro]'), d = e.target.closest('[data-abrir]'), av = e.target.closest('[data-avancar]'); if (f) {
         filtro = f.dataset.filtro;
         A.app.refresh();
     } if (d)
         A.app.ir('#/servicos/' + encodeURIComponent(d.dataset.abrir)); if (av)
-        acaoPrincipal(av.dataset.avancar); if (e.target.closest('[data-action="novoServico"]'))
-        abrirForm(); }); }
+        acaoPrincipal(av.dataset.avancar); if (e.target.closest('[data-action="novoServico"]')) abrirForm();
+        if (e.target.closest('[data-action="limparFiltros"]')) { filtro = 'todos'; busca = ''; A.app.refresh(); root.querySelector('#buscar-servicos')?.focus(); } }); }
     function conflito(dados, id) { if (!dados.data || !dados.hora || dados.status === 'cancelado')
         return false; const inicio = U.horaMinutos(dados.hora), fim = inicio + Number(dados.duracaoMin || 60); return S.lista('servicos').some(s => s.id !== id && s.data === dados.data && s.status !== 'cancelado' && s.hora && inicio < U.horaMinutos(s.hora) + Number(s.duracaoMin || 60) && U.horaMinutos(s.hora) < fim); }
     function abrirForm(id, preencher = {}) {
@@ -27,6 +27,7 @@
         }
         const catalogo = S.lista('catalogo'), ativos = somenteAtivos(), clientes = S.lista('clientes').sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
         let itens = (preencher.itens || antigo?.itens || []).map(i => ({ ...i, chave: U.id() }));
+        if (!itens.length && ativos.length) itens.push({ chave: U.id(), catalogoId: '', nome: '', qtd: 1, precoUnit: 0 });
         let etapas = (preencher.etapas || antigo?.etapas || []).map(e => ({ ...e }));
         let parcelas = (preencher.parcelas || antigo?.parcelas || [{ id: U.id(), valor: 0, vencimento: preencher.data || U.hoje(), pago: false, pagoEm: null, formaPagamento: null }]).map(p => ({ ...p }));
         const data = preencher.data || antigo?.data || U.hoje();
@@ -36,7 +37,7 @@
         const opçõesClientes = [{ value: '', label: 'Selecione um cliente' }, ...clientes.map(c => ({ value: c.id, label: c.nome }))];
         const profissionais = S.lista('profissionais').filter(p => p.ativo || p.id === antigo?.profissionalId);
         const recorrencia = preencher.recorrencia || antigo?.recorrencia || {ativa:false,intervalo:1,unidade:'meses'};
-        const campos = `<form id="form-servico" class="form-grid"><div class="form-grid">${UI.campo('Cliente', 'clienteId', preencher.clienteId || antigo?.clienteId || '', { required: true, options: opçõesClientes })}<button class="btn secundario compacto" type="button" data-novo-cliente>+ Criar cliente agora</button></div>${profissionais.length ? UI.campo('Profissional','profissionalId',preencher.profissionalId ?? antigo?.profissionalId ?? '',{ options:[{value:'',label:'Não atribuído'},...profissionais.map(p=>({value:p.id,label:p.nome}))] }) : ''}${UI.campo('Título', 'titulo', titulo, { attrs: 'placeholder="Ex.: Atendimento ou instalação"' })}<div class="section-heading"><h3>Itens do catálogo</h3><button type="button" class="btn secundario compacto" data-add-item>+ Item</button></div><div id="itens-form" class="stack"></div><div id="itens-erro" class="field-error"></div>${UI.campo('Desconto (R$)', 'desconto', U.numerico(valor), { attrs: 'inputmode="decimal" data-mask="moeda"' })}<div class="detail-row"><strong>Total</strong><strong class="numero destaque" id="total-form">${U.dinheiro(0)}</strong></div><div class="form-grid duas">${UI.campo('Data', 'data', data, { type: 'date', required: true })}${UI.campo('Hora', 'hora', preencher.hora || antigo?.hora || '09:00', { type: 'time', required: true })}</div>${UI.campo('Duração (min)', 'duracaoMin', preencher.duracaoMin ?? antigo?.duracaoMin ?? 60, { type: 'number', attrs: 'min="0" step="5" inputmode="numeric"' })}${UI.campo('Endereço', 'endereco', preencher.endereco ?? antigo?.endereco ?? '')}${UI.campo('Observações', 'observacoes', preencher.observacoes ?? antigo?.observacoes ?? '', { type: 'textarea' })}<div class="recorrencia-form"><label class="check-row"><input type="checkbox" name="recorrenciaAtiva" ${recorrencia.ativa ? 'checked' : ''}> Repetir este serviço</label><div class="form-grid duas">${UI.campo('Intervalo','recorrenciaIntervalo',recorrencia.intervalo || 1,{type:'number',attrs:'min="1" max="999" inputmode="numeric"'})}${UI.campo('Unidade','recorrenciaUnidade',recorrencia.unidade || 'meses',{options:[{value:'dias',label:'Dias'},{value:'semanas',label:'Semanas'},{value:'meses',label:'Meses'}]})}</div><div class="actions"><button type="button" class="btn secundario compacto" data-atalho="15:dias">15 dias</button><button type="button" class="btn secundario compacto" data-atalho="1:meses">1 mês</button><button type="button" class="btn secundario compacto" data-atalho="6:meses">6 meses</button></div></div>${UI.campo('Status', 'status', status, { options: STATUS.map(s => ({ value: s, label: A.perfil.status?.[s] || ({ orcamento: 'Orçamento', agendado: 'Agendado', andamento: 'Em andamento', concluido: 'Concluído', pago: 'Pago', cancelado: 'Cancelado' })[s] })) })}${A.perfil.mostraEtapas ? `<section><div class="section-heading"><h3>Etapas</h3><button type="button" class="btn secundario compacto" data-add-etapa>+ Etapa</button></div><div id="etapas-form" class="stack"></div></section>` : ''}<section><div class="section-heading"><h3>Parcelas</h3>${A.perfil.parcelasMultiplas ? '<button type="button" class="btn secundario compacto" data-add-parcela>+ Parcela</button>' : ''}</div><div id="parcelas-form" class="stack"></div><p id="parcelas-aviso" class="aviso" role="alert" hidden></p></section><p id="conflito-aviso" class="aviso" role="status" hidden>Existe um compromisso nesse horário. Você pode salvar mesmo assim.</p><button type="submit" class="btn">Salvar ${A.perfil.rotulo.toLowerCase()}</button></form>`;
+        const campos = `<form id="form-servico" class="form-grid"><div class="form-grid">${UI.campo('Cliente', 'clienteId', preencher.clienteId || antigo?.clienteId || '', { required: true, options: opçõesClientes })}<button class="btn secundario compacto" type="button" data-novo-cliente aria-expanded="false" aria-controls="cliente-rapido">+ Criar cliente agora</button><div id="cliente-rapido" class="cliente-rapido" hidden>${UI.campo('Nome do novo cliente', 'novoClienteNome', '', { attrs: 'autocomplete="name"' })}${UI.campo('Telefone com DDD', 'novoClienteTelefone', '', { attrs: 'inputmode="tel" data-mask="telefone" autocomplete="tel"' })}<div class="actions"><button type="button" class="btn compacto" data-salvar-cliente>Adicionar cliente</button><button type="button" class="btn secundario compacto" data-cancelar-cliente>Cancelar</button></div></div></div>${profissionais.length ? UI.campo('Profissional','profissionalId',preencher.profissionalId ?? antigo?.profissionalId ?? '',{ options:[{value:'',label:'Não atribuído'},...profissionais.map(p=>({value:p.id,label:p.nome}))] }) : ''}${UI.campo('Título', 'titulo', titulo, { attrs: 'placeholder="Ex.: Atendimento ou instalação"' })}<div class="section-heading"><h3>Itens do catálogo</h3><button type="button" class="btn secundario compacto" data-add-item>+ Item</button></div><div id="itens-form" class="stack"></div><div id="itens-erro" class="field-error"></div>${UI.campo('Desconto (R$)', 'desconto', U.numerico(valor), { attrs: 'inputmode="decimal" data-mask="moeda"' })}<div class="detail-row"><strong>Total</strong><strong class="numero destaque" id="total-form">${U.dinheiro(0)}</strong></div><div class="form-grid duas">${UI.campo('Data', 'data', data, { type: 'date', required: true })}${UI.campo('Hora', 'hora', preencher.hora || antigo?.hora || '09:00', { type: 'time', required: true })}</div>${UI.campo('Duração (min)', 'duracaoMin', preencher.duracaoMin ?? antigo?.duracaoMin ?? 60, { type: 'number', attrs: 'min="0" step="5" inputmode="numeric"' })}${UI.campo('Endereço', 'endereco', preencher.endereco ?? antigo?.endereco ?? '')}${UI.campo('Observações', 'observacoes', preencher.observacoes ?? antigo?.observacoes ?? '', { type: 'textarea' })}<div class="recorrencia-form"><label class="check-row"><input type="checkbox" name="recorrenciaAtiva" ${recorrencia.ativa ? 'checked' : ''}> Repetir este serviço</label><div class="form-grid duas">${UI.campo('Intervalo','recorrenciaIntervalo',recorrencia.intervalo || 1,{type:'number',attrs:'min="1" max="999" inputmode="numeric"'})}${UI.campo('Unidade','recorrenciaUnidade',recorrencia.unidade || 'meses',{options:[{value:'dias',label:'Dias'},{value:'semanas',label:'Semanas'},{value:'meses',label:'Meses'}]})}</div><div class="actions"><button type="button" class="btn secundario compacto" data-atalho="15:dias">15 dias</button><button type="button" class="btn secundario compacto" data-atalho="1:meses">1 mês</button><button type="button" class="btn secundario compacto" data-atalho="6:meses">6 meses</button></div></div>${UI.campo('Status', 'status', status, { options: STATUS.map(s => ({ value: s, label: A.perfil.status?.[s] || ({ orcamento: 'Orçamento', agendado: 'Agendado', andamento: 'Em andamento', concluido: 'Concluído', pago: 'Pago', cancelado: 'Cancelado' })[s] })) })}${A.perfil.mostraEtapas ? `<section><div class="section-heading"><h3>Etapas</h3><button type="button" class="btn secundario compacto" data-add-etapa>+ Etapa</button></div><div id="etapas-form" class="stack"></div></section>` : ''}<section><div class="section-heading"><h3>Parcelas</h3>${A.perfil.parcelasMultiplas ? '<button type="button" class="btn secundario compacto" data-add-parcela>+ Parcela</button>' : ''}</div><div id="parcelas-form" class="stack"></div><p id="parcelas-aviso" class="aviso" role="alert" hidden></p></section><p id="conflito-aviso" class="aviso" role="status" hidden>Existe um compromisso nesse horário. Você pode salvar mesmo assim.</p></form><div class="sheet-save"><button type="submit" form="form-servico" class="btn">Salvar ${A.perfil.rotulo.toLowerCase()}</button></div>`;
         UI.modal((antigo ? 'Editar ' : 'Novo ') + A.perfil.rotulo.toLowerCase(), campos, sheet => {
             const f = sheet.querySelector('#form-servico'), el = s => sheet.querySelector(s);
             const pegarItens = () => itens.filter(i => i.catalogoId).map(({ catalogoId, nome, qtd, precoUnit }) => ({ catalogoId, nome, qtd: Number(qtd), precoUnit: Number(precoUnit) }));
@@ -63,10 +64,11 @@
                         UI.toast('Cadastre um item ativo no Catálogo.');
                         return;
                     }
-                    const c = ativos[0];
-                    itens.push({ chave: U.id(), catalogoId: c.id, nome: c.nome, qtd: 1, precoUnit: c.preco });
+                    const chave = U.id();
+                    itens.push({ chave, catalogoId: '', nome: '', qtd: 1, precoUnit: 0 });
                     desenharItens();
                     atualizarTotais();
+                    el('#itens-form').querySelector('[data-item="' + chave + '"] [data-catalogo]')?.focus();
                 }
                 if (b.hasAttribute('data-remove-item')) {
                     const row = b.closest('[data-item]');
@@ -93,8 +95,36 @@
                     sincronizar();
                 }
                 if (b.hasAttribute('data-novo-cliente')) {
-                    const draft = { clienteId: f.elements.clienteId.value, titulo: f.elements.titulo.value, data: f.elements.data.value, hora: f.elements.hora.value, endereco: f.elements.endereco.value, observacoes: f.elements.observacoes.value, duracaoMin: f.elements.duracaoMin.value, status: f.elements.status.value, desconto: U.lerMoeda(f.elements.desconto.value), itens: pegarItens(), etapas, parcelas, profissionalId:f.elements.profissionalId?.value || null, recorrencia:{ativa:f.elements.recorrenciaAtiva.checked, intervalo:+f.elements.recorrenciaIntervalo.value, unidade:f.elements.recorrenciaUnidade.value} };
-                    A.views.clientes.abrirForm(null, novoId => abrirForm(id, { ...draft, clienteId: novoId }));
+                    const painel = el('#cliente-rapido');
+                    painel.hidden = !painel.hidden;
+                    b.setAttribute('aria-expanded', String(!painel.hidden));
+                    if (!painel.hidden) f.elements.novoClienteNome.focus();
+                }
+                if (b.hasAttribute('data-cancelar-cliente')) {
+                    el('#cliente-rapido').hidden = true;
+                    el('[data-novo-cliente]').setAttribute('aria-expanded', 'false');
+                    el('[data-novo-cliente]').focus();
+                }
+                if (b.hasAttribute('data-salvar-cliente')) {
+                    const nome = f.elements.novoClienteNome.value.trim();
+                    const telefone = U.digitos(f.elements.novoClienteTelefone.value);
+                    UI.erro(f, 'novoClienteNome', nome ? '' : 'Informe o nome do cliente.');
+                    UI.erro(f, 'novoClienteTelefone', telefone.length >= 10 ? '' : 'Informe um telefone com DDD.');
+                    if (!nome || telefone.length < 10) return;
+                    b.disabled = true;
+                    try {
+                        const novoId = U.id();
+                        S.adicionar('clientes', { id: novoId, nome, telefone: U.mascaraTelefone(telefone), endereco: '', observacoes: '', criadoEm: U.dataHora() });
+                        f.elements.clienteId.add(new Option(nome, novoId, true, true));
+                        el('#cliente-rapido').hidden = true;
+                        el('[data-novo-cliente]').setAttribute('aria-expanded', 'false');
+                        f.elements.titulo.focus();
+                        UI.erro(f, 'clienteId', '');
+                        UI.toast('Cliente adicionado. Continue o serviço.');
+                    } catch (erro) {
+                        UI.toast(erro.message);
+                        b.disabled = false;
+                    }
                 }
             });
             f.addEventListener('change', e => {
@@ -135,6 +165,9 @@
                 if (['data', 'hora', 'duracaoMin', 'status'].includes(e.target.name))
                     sincronizar();
             });
+            f.addEventListener('click', e => { if (e.target.closest('[data-add-item],[data-remove-item],[data-add-etapa],[data-remove-etapa],[data-add-parcela],[data-remove-parcela],[data-atalho]')) sheet.dataset.alterado = 'true'; });
+            f.addEventListener('input', () => { sheet.dataset.alterado = 'true'; });
+            f.addEventListener('change', () => { sheet.dataset.alterado = 'true'; });
             f.elements.desconto.addEventListener('input', () => atualizarTotais());
             el('#parcelas-form').addEventListener('input', e => { if (!e.target.matches('[data-valor-parcela]'))
                 return; const p = parcelas.find(x => x.id === e.target.closest('[data-parcela]').dataset.parcela); if (p) {
@@ -155,7 +188,7 @@
                 UI.toast('Quite todas as parcelas antes de marcar como pago.');
                 return;
             } if (parcelas.every(p => p.pago))
-                dados.status = 'pago'; const temConflito = conflito(dados, id); const botaoSalvar = f.querySelector('[type="submit"]'); botaoSalvar.disabled = true; UI.tratarErro(() => { if (id) {
+                dados.status = 'pago'; const temConflito = conflito(dados, id); const botaoSalvar = sheet.querySelector('.sheet-save [type="submit"]'); botaoSalvar.disabled = true; UI.tratarErro(() => { if (id) {
                 const historico = [...antigo.historico];
                 if (antigo.status !== dados.status)
                     historico.push({ status: dados.status, em: U.dataHora() });

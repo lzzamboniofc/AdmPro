@@ -1216,3 +1216,35 @@ body.modal-aberto .modal-layer { overscroll-behavior:contain; }
 @media (min-width:1024px) and (max-width:1279px) {
   .semana { grid-template-columns:repeat(3,minmax(0,1fr)); }
 }
+
+/* Fluxo de uso rápido: formulário longo com ação visível e rolagem interna. */
+.sheet:has(#form-servico) {
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.sheet:has(#form-servico) #form-servico {
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  padding:2px 3px 20px;
+}
+.sheet-save {
+  flex:0 0 auto;
+  padding-top:12px;
+  border-top:1px solid var(--borda);
+  background:var(--superficie);
+}
+.sheet-save .btn { width:100%; }
+.cliente-rapido {
+  border:1px solid var(--borda);
+  border-radius:14px;
+  padding:16px;
+  display:grid;
+  gap:12px;
+  background:var(--fundo);
+}
+.cliente-rapido[hidden] { display:none; }
+.chip.filtro { min-height:44px; }
+.segmented button { min-height:44px; }

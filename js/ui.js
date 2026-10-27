@@ -38,11 +38,16 @@
         focoAnterior?.isConnected && focoAnterior.focus({ preventScroll:true });
         focoAnterior = null;
     }
-    function modal(titulo, conteudo, aoAbrir) { fechar(); focoAnterior = document.activeElement; yAnterior = window.scrollY; const root = $('#modal-root'); root.innerHTML = `<div class="modal-layer"><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"><header class="sheet-header"><h2 id="sheet-title">${U.escapar(titulo)}</h2><button type="button" class="icon-button" data-close aria-label="Fechar">${icon('close')}</button></header>${conteudo}</section></div>`; document.body.classList.add('modal-aberto'); document.body.style.top = -yAnterior + 'px'; root.querySelector('[data-close]').addEventListener('click', fechar); root.querySelector('.modal-layer').addEventListener('click', e => { if (e.target.classList.contains('modal-layer'))
-        fechar(); }); mascara(root);
+    function fecharPeloUsuario() {
+        const folha = $('#modal-root .sheet');
+        if (folha?.dataset.alterado === 'true' && !window.confirm('Descartar alterações não salvas?')) return;
+        fechar();
+    }
+    function modal(titulo, conteudo, aoAbrir) { fechar(); focoAnterior = document.activeElement; yAnterior = window.scrollY; const root = $('#modal-root'); root.innerHTML = `<div class="modal-layer"><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"><header class="sheet-header"><h2 id="sheet-title">${U.escapar(titulo)}</h2><button type="button" class="icon-button" data-close aria-label="Fechar">${icon('close')}</button></header>${conteudo}</section></div>`; document.body.classList.add('modal-aberto'); document.body.style.top = -yAnterior + 'px'; root.querySelector('[data-close]').addEventListener('click', fecharPeloUsuario); root.querySelector('.modal-layer').addEventListener('click', e => { if (e.target.classList.contains('modal-layer'))
+        fecharPeloUsuario(); }); mascara(root);
         const sheet = root.querySelector('.sheet');
         sheet.addEventListener('keydown', e => {
-            if (e.key === 'Escape') { e.stopPropagation(); fechar(); return; }
+            if (e.key === 'Escape') { e.stopPropagation(); fecharPeloUsuario(); return; }
             if (e.key !== 'Tab') return;
             const focaveis = [...sheet.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href]')].filter(n => n.getClientRects().length);
             if (!focaveis.length) return;

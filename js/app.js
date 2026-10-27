@@ -52,7 +52,7 @@
             view.bindDetalhe(main, r.id);
         else if (view)
             view.bind?.(main,r.tipo,r.id);
-        const acoes = { inicio: () => A.views.servicos.abrirForm(), agenda: () => A.views.servicos.abrirForm(null, { data: U.hoje() }), clientes: () => A.views.clientes.abrirForm(), servicos: () => A.views.servicos.abrirForm(), detalhe: () => A.views.servicos.abrirForm(), financeiro: () => A.views.financeiro.abrirForm(), catalogo: () => A.views.catalogo.abrirForm() };
+        const acoes = { inicio: () => A.views.servicos.abrirForm(), agenda: () => A.views.servicos.abrirForm(null, { data: U.hoje() }), clientes: () => A.views.clientes.abrirForm(), servicos: () => A.views.servicos.abrirForm(), financeiro: () => A.views.financeiro.abrirForm(), catalogo: () => A.views.catalogo.abrirForm() };
         fab.hidden = !acoes[r.nome];
         fab.innerHTML = UI.icon('plus');
         fab.setAttribute('aria-label', r.nome === 'financeiro' ? 'Novo lançamento' : r.nome === 'clientes' ? 'Novo cliente' : `Novo ${A.perfil.rotulo.toLowerCase()}`);
