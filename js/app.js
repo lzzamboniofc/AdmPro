@@ -22,7 +22,7 @@
     else
         location.hash = hash; }
     function rota() { const config = S.obter('config'); if (!config)
-        return { nome: 'onboarding' }; const partes = (location.hash.replace(/^#\/?/, '') || 'inicio').split('/'); const nome = partes[0] || 'inicio'; if (nome === 'gestao' && ['meta','estoque','profissionais','despesas'].includes(partes[1])) return {nome:'gestao',tipo:partes[1],id:partes[2] || null}; if (nome === 'servicos' && partes[1])
+        return { nome: 'onboarding' }; const partes = (location.hash.replace(/^#\/?/, '') || 'inicio').split('/'); const nome = partes[0] || 'inicio'; if(nome==='gestao'&&partes[1]==='profissionais')return {nome:'equipe'}; if (nome === 'gestao' && ['meta','estoque','despesas'].includes(partes[1])) return {nome:'gestao',tipo:partes[1],id:partes[2] || null}; if (nome === 'servicos' && partes[1])
         { try { return { nome: 'detalhe', id: decodeURIComponent(partes[1]) }; } catch (_) { return { nome: 'naoEncontrado' }; } } return { nome: menu.some(x => x[0] === nome) || ['config','catalogo','assinatura','suporte','equipe','empresas'].includes(nome) ? nome : 'naoEncontrado' }; }
     function refresh() {
         if(!A.auth.pronto || !A.auth.usuario || new URLSearchParams(location.search).get('modo')==='recuperar'){
