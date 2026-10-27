@@ -105,3 +105,18 @@ O relatório de inspeção e as limitações dos testes estão em [`docs/auditor
 ## Auditoria de usabilidade
 
 As melhorias de fluxo e os cenários de validação do cadastro rápido, formulário de serviço, filtros e navegação constam em [`docs/auditoria-usabilidade.md`](docs/auditoria-usabilidade.md). Atualização de cache: `admpro-estaticos-v3-5`. Permanecem pendentes os testes em dispositivos físicos e com usuários reais.
+
+## Revisão web e agenda personalizada (v3.6)
+
+- Acesso às Configurações visível na barra lateral do desktop e no cabeçalho mobile, com ícone de engrenagem.
+- Formulário de serviços com seletor, quantidade e lixeira alinhados; Catálogo com retorno às Configurações.
+- Confirmações e descarte de alterações em modais internos; nenhum `window.alert()` ou `window.confirm()` é utilizado. O diálogo de instalação do PWA é a interface nativa do navegador.
+- Avisos no topo com botão de fechar, acima dos modais e sem bloquear o conteúdo.
+- Modais de pagamento não alteram a largura/posição do corpo da página ao abrir ou fechar.
+- Agenda semanal com colunas mais largas no desktop e conteúdo geral sem largura excessivamente limitada.
+- Horários por dia da semana, com abertura/fechamento e um ou dois períodos; permitem pausa para almoço, meio período e folga. A agenda respeita o expediente; serviços fora dele continuam permitidos com aviso.
+- Configurações antigas (somente `horaInicio`, `horaFim`, `diasAtendimento`) continuam válidas: são convertidas visualmente e o formato antigo é preservado para compatibilidade com backup v3. A nova configuração opcional se chama `horariosSemana`.
+- Modelos de negócio preservam exemplos do setor, mas utilizam rótulos genéricos de Atendimento ou Serviço, evitando restringir registros a corte, banho, reparo etc.
+- Relatórios com separação de blocos e métricas; PIN com quatro indicadores e teclado do aparelho, sem teclado desenhado.
+
+Teste das regras de horários: `node --test tests/horarios.js`. Teste de integração de interface foi feito em Chromium com HTML/CSS/JS carregados em memória em 360, 768, 1280 e 1600px, usando dados de demonstração. Testes reais de Safari/iOS, Android e PWA instalado ainda são necessários.

@@ -4,7 +4,7 @@
     const U = A.utils, UI = A.ui;
     let passo = 1;
     let usarExemplo = false;
-    let rascunho = { nomeNegocio: '', telefone: '', tipoNegocio: 'rapido', modeloNegocio:'manicure', horaInicio: '08:00', horaFim: '18:00', diasAtendimento: [1, 2, 3, 4, 5, 6] };
+    let rascunho = { nomeNegocio: '', telefone: '', tipoNegocio: 'rapido', modeloNegocio:'manicure', horaInicio: '08:00', horaFim: '18:00', diasAtendimento: [1, 2, 3, 4, 5, 6], horariosSemana: Array.from({length:7},(_,i)=>({ ativo:i>0, turnos:i>0?[{inicio:'08:00',fim:'12:00'},{inicio:'13:00',fim:'18:00'}]:[] })) };
     const dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     function render() {
         let interior = '';
@@ -13,7 +13,7 @@
         if (passo === 2)
             interior = `<h1>Escolha seu modelo de negócio</h1><p class="muted" style="margin:12px 0 24px">Modelos alteram rótulos e exemplos sem limitar funções.</p><div class="modelos-grade">${Object.entries(A.modelos).map(([chave, modelo]) => `<button class="option-card" type="button" data-modelo="${chave}" aria-pressed="${rascunho.modeloNegocio===chave}"><span class="modelo-icone" aria-hidden="true">${modelo.icone}</span><strong>${U.escapar(modelo.nome)}</strong><small>${U.escapar(modelo.rotulo)}</small></button>`).join('')}</div><div class="actions"><button class="btn secundario" data-prev>Voltar</button><button class="btn" data-next>Continuar</button></div>`;
         if (passo === 3)
-            interior = `<h1>Horário de atendimento</h1><p class="muted" style="margin:12px 0 24px">Escolha seus dias e seu horário habitual.</p><form id="horario-form" class="form-grid"><div class="form-grid duas">${UI.campo('Início', 'horaInicio', rascunho.horaInicio, { type: 'time', required: true })}${UI.campo('Fim', 'horaFim', rascunho.horaFim, { type: 'time', required: true })}</div><div class="field"><span class="label">Dias de atendimento</span><div class="dias">${dias.map((d, i) => `<label><input type="checkbox" name="dia" value="${i}" ${rascunho.diasAtendimento.includes(i) ? 'checked' : ''}>${d}</label>`).join('')}</div><div class="field-error" id="dias-erro"></div></div><div class="actions"><button class="btn secundario" data-prev type="button">Voltar</button><button class="btn" type="submit">Continuar</button></div></form>`;
+            interior = `<h1>Horários de atendimento</h1><p class="muted" style="margin:12px 0 24px">Personalize cada dia, incluindo almoço, meio período e folgas.</p><form id="horario-form" class="form-grid">${UI.editorHorarios(rascunho)}<div class="actions"><button class="btn secundario" data-prev type="button">Voltar</button><button class="btn" type="submit">Continuar</button></div></form>`;
         if (passo === 4)
             interior = `<h1>Pronto para começar!</h1><p class="muted" style="margin:12px 0 24px">Escolha se prefere explorar exemplos ou cadastrar tudo do zero.</p><div class="stack"><button class="btn" data-finish="exemplo">Começar com dados de exemplo</button><button class="btn secundario" data-finish="vazio">Começar vazio</button><button class="btn ghost" data-prev>Voltar</button></div>`;
         if (passo === 5)
@@ -27,10 +27,18 @@
         root.querySelector('[data-next]')?.addEventListener('click', () => { passo++; A.app.refresh(); });
         root.querySelector('#onboard-form')?.addEventListener('submit', e => { e.preventDefault(); if (!UI.validar(e.currentTarget))
             return; const d = new FormData(e.currentTarget); rascunho.nomeNegocio = d.get('nomeNegocio').trim(); rascunho.telefone = U.mascaraTelefone(d.get('telefone')); passo = 2; A.app.refresh(); });
-        root.querySelector('#horario-form')?.addEventListener('submit', e => { e.preventDefault(); const f = e.currentTarget; const dias = Array.from(f.querySelectorAll('[name="dia"]:checked'), c => Number(c.value)); const valido = UI.validar(f) && f.elements.namedItem('horaInicio').value < f.elements.namedItem('horaFim').value && dias.length > 0; if (!valido) {
-            root.querySelector('#dias-erro').textContent = 'Selecione dias e informe um horário final posterior ao inicial.';
-            return;
-        } rascunho.horaInicio = f.elements.namedItem('horaInicio').value; rascunho.horaFim = f.elements.namedItem('horaFim').value; rascunho.diasAtendimento = dias; passo = 4; A.app.refresh(); });
+        const horarioForm=root.querySelector('#horario-form');
+        if(horarioForm) {
+            UI.ativarEditorHorarios(horarioForm);
+            horarioForm.addEventListener('submit', e => { e.preventDefault();
+                try { const semana=UI.lerEditorHorarios(horarioForm); rascunho.horariosSemana=semana;
+                    rascunho.diasAtendimento=semana.flatMap((d,i)=>d.ativo?[i]:[]);
+                    rascunho.horaInicio=semana.flatMap(d=>d.turnos.map(t=>t.inicio)).sort()[0] || '08:00';
+                    rascunho.horaFim=semana.flatMap(d=>d.turnos.map(t=>t.fim)).sort().at(-1) || '18:00';
+                    passo=4; A.app.refresh();
+                } catch(err) { horarioForm.querySelector('[data-erro-horarios]').textContent=err.message; }
+            });
+        }
         root.querySelectorAll('[data-finish]').forEach(b => b.onclick = () => { usarExemplo = b.dataset.finish === 'exemplo'; passo = 5; A.app.refresh(); });
         root.querySelector('#form-pin-inicial')?.addEventListener('submit', async e => {
             e.preventDefault();

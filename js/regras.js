@@ -6,6 +6,23 @@
     const moeda = U.deCentavos;
     const somar = valores => moeda(valores.reduce((total, valor) => total + cent(valor), 0));
 
+    // Agenda por dia: até dois turnos (inclui pausa de almoço e meio período).
+    function horariosSemana(config = {}) {
+        if (Array.isArray(config.horariosSemana) && config.horariosSemana.length === 7) {
+            return config.horariosSemana.map(d => ({ ativo:!!d?.ativo,
+                turnos:(d?.turnos || []).map(t => ({ inicio:t.inicio, fim:t.fim })) }));
+        }
+        return Array.from({length:7}, (_,dia) => ({
+            ativo:(config.diasAtendimento || [1,2,3,4,5,6]).includes(dia),
+            turnos:[{inicio:config.horaInicio || '08:00', fim:config.horaFim || '18:00'}]
+        }));
+    }
+    function horarioDisponivel(config, data, hora, duracao = 0) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(data || '') || !/^\d{2}:\d{2}$/.test(hora || '')) return false;
+        const d = horariosSemana(config)[U.parseData(data).getDay()];
+        const inicio = U.horaMinutos(hora), fim = inicio + Number(duracao || 0);
+        return d.ativo && d.turnos.some(t => inicio >= U.horaMinutos(t.inicio) && fim <= U.horaMinutos(t.fim));
+    }
     function proximaData(data, recorrencia) {
         if (!recorrencia?.ativa || !Number.isInteger(+recorrencia.intervalo) || +recorrencia.intervalo < 1) return null;
         const quantidade = +recorrencia.intervalo;
@@ -115,5 +132,5 @@
             receita: [...produtos].sort((a,b)=>b.valor-a.valor).slice(0,5), quantidadeItens: [...produtos].sort((a,b)=>b.qtd-a.qtd).slice(0,5),
             clientes: clientesTop.sort((a,b)=>b.valor-a.valor).slice(0,5), sumidos, despesas, comissoes: comissoesLista };
     }
-    A.regras = { proximaData, itensEstoque, estoqueBaixo, movimento, despesasDoMes, comissaoServico, comissoes, metaMensal, periodo, relatorio };
+    A.regras = { horariosSemana, horarioDisponivel, proximaData, itensEstoque, estoqueBaixo, movimento, despesasDoMes, comissaoServico, comissoes, metaMensal, periodo, relatorio };
 })(window.AdmPro = window.AdmPro || {});

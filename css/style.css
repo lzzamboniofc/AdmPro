@@ -1248,3 +1248,78 @@ body.modal-aberto .modal-layer { overscroll-behavior:contain; }
 .cliente-rapido[hidden] { display:none; }
 .chip.filtro { min-height:44px; }
 .segmented button { min-height:44px; }
+
+/* Revisão de usabilidade web v3.6: navegação permanente e largura aproveitada. */
+@media(min-width:1024px) {
+  #conteudo { padding:88px clamp(24px,3vw,52px) 72px; }
+  .nav-item.config-sidebar { display:flex; }
+  .semana { grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; }
+  .semana-dia { padding:16px; }
+  .semana-dia .agenda-item { overflow-wrap:anywhere; }
+  .semana-dia .btn { width:100%; margin-top:12px; }
+}
+@media(min-width:1800px) { #conteudo { padding-inline:56px; } .semana { grid-template-columns:repeat(7,minmax(0,1fr)); } }
+.nav-item.config-sidebar { display:none; }
+@media(min-width:1024px) { .nav-item.config-sidebar { display:flex; } }
+.topbar-config { display:inline-flex; flex:none; align-items:center; gap:8px; min-height:44px; padding:6px 10px; border-radius:10px; color:var(--texto); text-decoration:none; font-size:14px; font-weight:600; }
+.topbar-config:hover, .topbar-config[aria-current] { background:var(--primaria-suave); }
+.topbar-config .icone { width:22px; height:22px; }
+@media(max-width:767px) { .topbar-config span { display:none; } .topbar-config { padding:8px; } }
+@media(min-width:1024px) { .topbar-config { display:none; } }
+/* Avisos no topo, acima dos modais, fecháveis e sem bloquear o conteúdo. */
+#toast-root { position:fixed; z-index:120; left:0; right:0; top:calc(10px + env(safe-area-inset-top)); pointer-events:none; display:flex; justify-content:center; padding:0 12px; }
+.toast, .toast-acao { position:relative; inset:auto; left:auto; right:auto; bottom:auto; top:auto; pointer-events:auto; width:min(100%,560px); display:flex; align-items:center; gap:12px; text-align:left; padding:12px 14px; box-shadow:0 8px 24px rgba(0,0,0,.22); }
+.toast > span { flex:1; min-width:0; overflow-wrap:anywhere; }
+.toast-acao button { flex:none; }
+.toast .toast-fechar { width:36px; min-width:36px; height:36px; line-height:1; font-size:24px; padding:0; border:0; background:transparent; color:inherit; border-radius:8px; }
+.toast .toast-fechar:hover { background:rgba(128,128,128,.18); }
+/* Corrige deslocamento lateral do body ao abrir o recebimento/modal. */
+html.modal-scroll-lock { overflow:hidden; scrollbar-gutter:stable; }
+body.modal-aberto { position:static; top:auto!important; width:auto; overflow:hidden; }
+.modal-layer { position:fixed; inset:0; }
+.descarte-layer { position:fixed; inset:0; z-index:75; display:grid; place-items:center; padding:20px; background:rgba(0,0,0,.62); }
+.descarte-card { width:min(100%,420px); background:var(--superficie); color:var(--texto); border-radius:18px; padding:24px; box-shadow:0 12px 38px rgba(0,0,0,.2); display:grid; gap:16px; }
+.descarte-card .actions { justify-content:flex-end; }
+/* Alinhamento consistente de seletor, quantidade e ação excluir. */
+.item-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(72px,86px) 44px; gap:10px; align-items:end; }
+.item-row > .field { min-width:0; margin:0; }
+.item-row > .field select,.item-row > .field input { width:100%; min-width:0; }
+.item-row > [data-remove-item] { width:44px; height:48px; align-self:end; margin:0; }
+.item-preco { grid-column:1/-1; margin-top:-5px; font-size:12px; }
+@media(max-width:390px) { .item-row { gap:7px; grid-template-columns:minmax(0,1fr) 70px 44px; } }
+/* Agenda aberta/fechada e indicação dos turnos de cada dia. */
+.agenda-turno-titulo { background:var(--primaria-suave); color:var(--texto); font-weight:700; border-radius:10px; padding:10px 14px; margin:14px 0 8px; }
+.agenda-expediente { min-height:42px; font-size:12px; color:var(--texto-secundario); margin:0 0 10px; line-height:1.4; }
+.semana-dia { display:flex; flex-direction:column; gap:6px; }
+.semana-dia .agenda-envoltorio { margin-bottom:10px; }
+.semana-dia > .btn { margin-top:auto; }
+/* Dias de folga, manhã, tarde e almoço configuráveis sem perder legados. */
+.horarios-editor { border:1px solid var(--borda); border-radius:14px; margin:0; min-width:0; padding:16px; }
+.horarios-editor legend { font-weight:700; padding:0 6px; }
+.horarios-editor > .muted { margin-bottom:14px; }
+.horario-dia { padding:14px 0; border-bottom:1px solid var(--borda); }
+.horario-dia:last-of-type { border-bottom:0; }
+.horario-toggle { display:flex; align-items:center; gap:10px; cursor:pointer; min-height:44px; }
+.horario-toggle input { width:19px; height:19px; flex:none; }
+.horario-toggle strong { flex:1; }
+.horario-estado { font-size:12px; color:var(--texto-secundario); }
+.horario-turnos { display:grid; gap:12px; padding:12px 0 2px 29px; }
+.horario-turno { display:grid; grid-template-columns:1fr minmax(92px,1fr) auto minmax(92px,1fr); gap:8px; align-items:center; }
+.horario-turno span { font-size:12px; color:var(--texto-secundario); }
+.horario-turno input { width:100%; min-width:0; min-height:44px; border:1px solid var(--borda); border-radius:8px; color:var(--texto); background:var(--superficie); padding:4px 6px; }
+.horario-pausa { font-size:13px; }
+@media(max-width:530px) { .horarios-editor { padding:12px; } .horario-turnos { padding-left:0; } .horario-turno { grid-template-columns:1fr 1fr; gap:6px 10px; } .horario-turno span:first-child { grid-column:1/-1; } .horario-turno span:nth-of-type(2) { display:none; } }
+/* Relatórios com blocos e respiros entre métricas. */
+.relatorio-resumo { margin:16px 0 22px; gap:14px; }
+.relatorio-resumo .card { display:grid; gap:8px; align-content:start; }
+.relatorio-bloco + .relatorio-bloco { border-top:1px solid var(--borda); margin-top:24px; padding-top:24px; }
+.relatorio-bloco h2 { margin-bottom:14px; }
+.relatorio-linha { padding:15px 0; gap:18px; }
+.relatorio-linha:last-child { border-bottom:0; }
+@media(max-width:767px) { .relatorio-resumo > .card:last-child:nth-child(odd) { grid-column:1 / -1; } .relatorio-linha { flex-wrap:wrap; } }
+/* PIN com os quatro marcadores OTP; o campo real usa teclado nativo. */
+.tela-seguranca #pin-entrada { position:absolute; z-index:2; opacity:0; inset:0; width:100%; height:100%; cursor:text; }
+.tela-seguranca .pin-pontos { position:relative; display:flex; justify-content:center; gap:12px; margin:16px auto 20px; cursor:text; }
+.pin-pontos span { display:block; width:52px; height:58px; border:2px solid var(--borda); border-radius:12px; background:var(--superficie); position:relative; }
+.pin-pontos span.preenchido::after { content:'●'; position:absolute; inset:0; display:grid; place-items:center; color:var(--texto); font-size:17px; }
+.tela-seguranca form:focus-within .pin-pontos span { border-color:var(--primaria); }
