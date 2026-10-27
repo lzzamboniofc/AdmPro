@@ -114,7 +114,20 @@ try{
       await page.locator('[data-empresa]').first().waitFor();
       assert.equal(await page.locator('[data-empresa]').count(),2);
       await page.locator('[data-empresa="10000000-0000-4000-8000-000000000002"]').click();
-      await page.locator('.topbar-nome:has-text("Estúdio Secundário")').waitFor();
+      try {
+        await page.locator('.topbar-nome:has-text("Estúdio Secundário")').waitFor({timeout:6000});
+      } catch(err) {
+        const estado=await page.evaluate(()=>({
+          rota:location.hash,
+          nomeConta:window.AdmPro.auth.conta?.nome_negocio,
+          nomeConfig:window.AdmPro.storage.obter('config')?.nomeNegocio,
+          titulo:document.querySelector('#conteudo')?.innerText.slice(0,500),
+          sync:window.AdmPro.storage.estadoSync(),
+          pin:!!document.querySelector('#form-criar-pin')
+        }));
+        console.error('DIAGNOSTICO TROCA EMPRESA:',JSON.stringify(estado));
+        throw err;
+      }
       const clientes=await page.evaluate(()=>window.AdmPro.storage.lista('clientes').map(c=>c.nome));
       assert.ok(clientes.includes('Cliente Secundário'));
       assert.ok(!clientes.includes('Cliente Ana'),'Cache não pode trazer clientes da outra empresa.');
