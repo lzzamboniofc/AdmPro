@@ -197,6 +197,88 @@ try{
     }finally{await context.close()}
   });
 
+  await run('visual: contrastes, espaçamentos e largura dos temas claro, escuro e automático',async()=>{
+    const {page,context,erros}=await abrir('dono',390);
+    try{
+      await page.goto(origin+'?perfil=dono#/equipe');
+      await page.locator('h1:has-text("Equipe e Profissionais")').waitFor();
+      await page.evaluate(()=>{
+        const box=document.createElement('section');
+        box.id='visual-fixture';
+        box.innerHTML='<div class="admpro-banner alerta">Assinatura atrasada. <a href="#/assinatura">Pagar</a></div>'+
+          '<div class="admpro-aviso alerta">Aviso de segurança</div>'+
+          '<div class="resposta-suporte">Resposta enviada pelo suporte.</div>'+
+          '<article class="card"><button class="btn ghost" type="button">Ação discreta</button>'+
+          '<button class="btn perigo" type="button">Ação perigosa</button></article>';
+        document.getElementById('conteudo').append(box);
+        window.AdmPro.ui.toastAcao('Atualização disponível','Atualizar',()=>{});
+      });
+      const contrast=(a,b)=>{
+        const rgb=s=>(s.match(/[\\d.]+/g)||[]).slice(0,3).map(Number);
+        const lum=c=>{
+          const q=rgb(c).map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);
+          return .2126*q[0]+.7152*q[1]+.0722*q[2];
+        };
+        const l1=lum(a),l2=lum(b);
+        return (Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05);
+      };
+      for(const tema of ['light','dark','auto']){
+        await page.emulateMedia({colorScheme:tema==='auto'?'dark':'light'});
+        await page.evaluate(t=>document.documentElement.dataset.theme=t,tema);
+        for(const width of [360,390,768,1280]){
+          await page.setViewportSize({width,height:850});
+          const medidas=await page.evaluate(()=>{
+            const style=sel=>getComputedStyle(document.querySelector(sel));
+            const get=sel=>({color:style(sel).color,bg:style(sel).backgroundColor});
+            return {
+              overflow:document.documentElement.scrollWidth-window.innerWidth,
+              topo:document.querySelector('.page-heading').getBoundingClientRect().width,
+              largura:document.getElementById('conteudo').getBoundingClientRect().width,
+              banner:get('.admpro-banner.alerta'),
+              aviso:get('.admpro-aviso.alerta'),
+              suporte:get('.resposta-suporte'),
+              suporteBg:style('.resposta-suporte').backgroundColor,
+              ghost:style('#visual-fixture .btn.ghost').color,
+              surface:style('#visual-fixture .card').backgroundColor,
+              danger:get('#visual-fixture .btn.perigo'),
+              toast:get('.toast-acao'),
+              toastButton:style('.toast-acao button').color
+            };
+          });
+          assert.ok(medidas.overflow<=2,`Rolagem horizontal: ${tema} ${width}px / ${JSON.stringify(medidas)}`);
+          assert.ok(medidas.topo<=medidas.largura+2,`Cabeçalho ultrapassa conteúdo: ${tema} ${width}px`);
+          for(const k of ['banner','aviso','suporte','danger']){
+            assert.ok(contrast(medidas[k].color,medidas[k].bg)>=4.5,
+              `Contraste de ${k} insuficiente: ${tema} ${width}px / ${JSON.stringify(medidas[k])}`);
+          }
+          assert.ok(contrast(medidas.ghost,medidas.surface)>=4.5,
+            `Ação ghost ilegível no cartão: ${tema} ${width}px`);
+          assert.ok(contrast(medidas.toastButton,medidas.toast.bg)>=4.5,
+            `Botão da notificação ilegível: ${tema} ${width}px`);
+        }
+      }
+      // Sem topbar ou sidebar, o login precisa ocupar a largura correta.
+      await page.setViewportSize({width:1280,height:800});
+      const layoutLogin=await page.evaluate(()=>{
+        document.getElementById('topbar').hidden=true;
+        document.getElementById('navegacao').hidden=true;
+        const main=document.getElementById('conteudo');
+        main.innerHTML=window.AdmPro.views.autenticacao.render();
+        const rect=main.getBoundingClientRect();
+        return {left:rect.left,right:innerWidth-rect.right,
+          scroll:document.documentElement.scrollWidth-innerWidth,
+          card:main.querySelector('.auth-page .card').getBoundingClientRect().width,
+          viewport:innerWidth};
+      });
+      assert.ok(Math.abs(layoutLogin.left-layoutLogin.right)<=2,
+        'Login sem navegação deve ficar centralizado: '+JSON.stringify(layoutLogin));
+      assert.ok(layoutLogin.card>320&&layoutLogin.card<600,
+        'Cartão de login deve ser confortável no desktop: '+JSON.stringify(layoutLogin));
+      assert.ok(layoutLogin.scroll<=2,'Login não deve provocar rolagem lateral.');
+      assert.deepEqual(erros,[],'Erros JS na auditoria visual');
+    }finally{await context.close()}
+  });
+
   await run('redução de permissões limpa dados financeiros armazenados',async()=>{
     const {page,context,erros}=await abrir('dono');
     try{
