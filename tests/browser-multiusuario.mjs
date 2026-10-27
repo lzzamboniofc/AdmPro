@@ -31,7 +31,8 @@ async function abrir(perfil,width=1440){
   const page=await context.newPage(),erros=[];
   page.on('pageerror',e=>erros.push(e.message));
   await page.route('**/js/vendor/supabase.js',route=>route.fulfill({status:200,contentType:'application/javascript',body:fixture}));
-  await page.goto(origin+'?perfil='+perfil,{waitUntil:'load'});
+  const query='?perfil='+perfil+(perfil==='convidado'?'&convite=30000000-0000-4000-8000-000000000999':'');
+  await page.goto(origin+query,{waitUntil:'load'});
   const pin=page.locator('#form-criar-pin');
   await Promise.race([
     pin.waitFor({state:'visible',timeout:12000}).catch(()=>{}),
@@ -104,6 +105,23 @@ try{
       await page.goto(origin+'?perfil=profissional#/equipe');
       await page.getByText('Acesso restrito').waitFor();
       assert.deepEqual(erros,[],'Erros JS durante navegação profissional');
+    }finally{await context.close()}
+  });
+
+  await run('convidado: aceite vincula à empresa sem criar conta paralela',async()=>{
+    const {page,context,erros}=await abrir('convidado',390);
+    try{
+      const aceito=await page.evaluate(()=>window.__admproMock.conviteAceito);
+      assert.equal(aceito,true,'Convite autenticado deveria ser aceito.');
+      const vinculos=await page.evaluate(()=>window.AdmPro.auth.contas.map(c=>c.nome_negocio));
+      assert.equal(vinculos.length,1);
+      assert.equal(vinculos[0],'Estúdio Principal');
+      assert.ok(!new URL(page.url()).searchParams.has('convite'),'URL deve remover convite utilizado.');
+      await page.goto(origin+'?perfil=convidado#/agenda');
+      await page.locator('h1:has-text("Agenda")').waitFor();
+      await page.goto(origin+'?perfil=convidado#/financeiro');
+      await page.getByText('Acesso restrito').waitFor();
+      assert.deepEqual(erros,[]);
     }finally{await context.close()}
   });
 
