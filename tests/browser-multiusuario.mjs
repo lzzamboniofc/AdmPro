@@ -148,6 +148,70 @@ try{
       assert.deepEqual(erros,[],'Erros JS durante troca de empresa');
     }finally{await context.close()}
   });
+  await run('recepção: recebimento seguro atualiza serviço e registra receita uma vez',async()=>{
+    const {page,context,erros}=await abrir('recepcao',390);
+    try{
+      await page.goto(origin+'?perfil=recepcao#/servicos/atend-recepcao');
+      await page.locator('button[data-pagar="parcela-recepcao"]').waitFor();
+      await page.locator('button[data-pagar="parcela-recepcao"]').click();
+      await page.locator('#form-pagamento [name="formaPagamento"]').selectOption('pix');
+      await page.locator('#form-pagamento [type="submit"]').click();
+      await page.waitForFunction(()=>{
+        const m=window.__admproMock;
+        return m.rows.find(x=>x.id==='atend-recepcao')?.dados.parcelas?.[0]?.pago===true;
+      });
+      const estado=await page.evaluate(()=>{
+        const rs=window.__admproMock.rows;
+        return {servico:rs.find(x=>x.id==='atend-recepcao')?.dados,
+          receitas:rs.filter(x=>x.colecao==='lancamentos'&&x.dados.servicoId==='atend-recepcao')};
+      });
+      assert.equal(estado.servico.status,'pago');
+      assert.equal(estado.receitas.length,1);
+      assert.equal(estado.receitas[0].dados.valor,80);
+      assert.equal(await page.locator('[data-estornar]').count(),0,'Recepção não pode estornar sem permissão financeira.');
+      await page.goto(origin+'?perfil=recepcao#/financeiro');
+      await page.getByText('Acesso restrito').waitFor();
+      assert.deepEqual(erros,[]);
+    }finally{await context.close()}
+  });
+
+  await run('revogação ao reconectar limpa empresa e bloqueia dados antigos',async()=>{
+    const {page,context,erros}=await abrir('dono',390);
+    try{
+      await page.goto(origin+'?perfil=dono#/clientes');
+      await page.getByText('Cliente Ana').first().waitFor();
+      await context.setOffline(true);
+      await page.evaluate(()=>window.__admproMock.revogar());
+      await context.setOffline(false);
+      await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+      await page.getByText('Nenhuma empresa vinculada.').waitFor({timeout:12000});
+      const estado=await page.evaluate(()=>({
+        conta:window.AdmPro.auth.conta,
+        clientes:window.AdmPro.storage.lista('clientes'),
+        keys:Object.keys(localStorage).filter(k=>k.includes('10000000-0000-4000-8000-000000000001'))
+      }));
+      assert.equal(estado.conta,null);
+      assert.equal(estado.clientes.length,0);
+      assert.equal(estado.keys.length,0,'Cache revogado precisa ser apagado.');
+      assert.deepEqual(erros,[]);
+    }finally{await context.close()}
+  });
+
+  await run('redução de permissões limpa dados financeiros armazenados',async()=>{
+    const {page,context,erros}=await abrir('dono');
+    try{
+      await page.evaluate(async()=>{
+        window.AdmPro.storage.adicionar('lancamentos',{id:'financeiro-local',tipo:'saida',valor:99,data:'2026-10-27',descricao:'Teste'});
+        window.__admproMock.rebaixar();
+        await window.AdmPro.auth.revalidarAcesso();
+      });
+      await page.goto(origin+'?perfil=dono#/financeiro');
+      await page.getByText('Acesso restrito').waitFor();
+      const n=await page.evaluate(()=>window.AdmPro.storage.lista('lancamentos').length);
+      assert.equal(n,0);
+      assert.deepEqual(erros,[]);
+    }finally{await context.close()}
+  });
 }finally{
   await browser.close();
   await new Promise(resolve=>server.close(resolve));
