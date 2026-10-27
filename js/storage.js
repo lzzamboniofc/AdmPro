@@ -54,8 +54,11 @@
     }
     async function definirPin(pin) {
         const config = obter('config');
-        if (!config) throw Error('Configure o negócio primeiro.');
-        gravar('config', { ...config, ...await hashPin(pin), versaoDados: VERSAO_DADOS });
+        if (!contaAtual || !usuarioAtual || !config) throw Error('Selecione uma empresa antes de criar o PIN.');
+        // O PIN pertence ao navegador e ao usuário; nunca altera a configuração
+        // empresarial nem exige config.editar para recepcionistas/profissionais.
+        const local={...config,...await hashPin(pin),versaoDados:VERSAO_DADOS};
+        localStorage.setItem(chaveCache('config'),JSON.stringify(local));
         abrirSessao();
     }
     function migrarDados() {
