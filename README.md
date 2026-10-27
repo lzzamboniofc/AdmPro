@@ -1,32 +1,54 @@
 # AdmPro
 
-Gestão de pequenos negócios em HTML5, CSS3 e JavaScript puro.
+Aplicativo de gestão para autônomos, profissionais e empresas com equipes — HTML, CSS e JavaScript sem build, com **Supabase Auth, banco compartilhado entre o app e o AdmPro Console, permissões por empresa e sincronização**.
 
-## Como abrir
+> **Estado em outubro de 2026:** a evolução multiusuário e multiprofissional está em homologação no branch `feature/multiusuario-multiprofissional`. Esta branch usa **somente o Supabase staging**. Não publicar nem promover dados de produção antes do procedimento em [docs/release-multiusuario.md](docs/release-multiusuario.md).
 
-Extraia a pasta e abra `index.html` diretamente no Chrome, inclusive por `file://`. Não é necessário servidor, internet, pacote npm ou build. Na primeira visita, conclua o cadastro inicial e crie um PIN de 4 dígitos e escolha iniciar com exemplos ou dados vazios.
+## Como testar a versão atual
 
-## Estrutura
+1. Disponibilize a pasta via HTTPS ou servidor local para permitir Auth, callbacks de e-mail e PWA. O arquivo `index.html` preserva arquivos relativos, mas **o fluxo de login/sincronização depende de acesso à rede**.
+2. Confira `js/config.js`: a versão do PR aponta exclusivamente para `admpro-staging`. Não inserir a chave `service_role` no navegador, Console ou repositório.
+3. Abra o aplicativo, faça login com uma conta de homologação autorizada. O PIN de quatro dígitos é uma **proteção local complementar**, não substitui o Supabase Auth.
+4. Em **Equipe e Profissionais**, cadastre os profissionais (podem trabalhar sem login), configure jornadas e ausências e convide usuários para papéis de dono, gerente, recepcionista ou profissional. Atribuições e acesso são separados.
+5. Use a Agenda por profissional. Usuários podem participar de mais de uma empresa e alternar entre elas; dados locais são segregados por usuário/empresa. Revogações e mudanças de permissão exigem reconexão para atualizar o acesso offline.
 
-- `index.html`: marcação principal e scripts na ordem de dependência.
-- `css/style.css`: estilos mobile first, tokens, temas e impressão.
-- `img/logo/svg/`: logos vetoriais para cabeçalho e onboarding (claras/escuras).
-- `img/logo/png/`: versões transparentes para documentos, impressos e marca.
-- `img/logo/favicon/`: favicon, ícone iOS e manifesto do aplicativo.
-- `js/utils.js`: máscaras, formatação, datas, cálculos e IDs.
-- `js/storage.js`: CRUD por coleção, importação, exportação e exemplos.
-- `js/ui.js`: modal, confirmações, toast e elementos compartilhados.
-- `js/views/seguranca.js`: criação de PIN e bloqueio local.
-- `js/views/`: onboarding, início, agenda, clientes, serviços, financeiro, catálogo e configurações.
-- `js/app.js`: perfil, roteamento por hash e inicialização.
+**Responsabilidade dos dados:** alterações locais são sincronizadas com Supabase, sujeitas a permissões e resolução de conflitos. Ação sensível como recebimento da recepção requer internet e uma RPC transacional; o modo offline não equivale a um backup ou a um controle de acesso instantâneo após revogação.
 
-## Persistência e futura API
+## Estrutura atual
 
-**Somente `js/storage.js` usa `localStorage`.** Todas as telas consomem `AdmPro.storage` (`obter`, `gravar`, `lista`, `porId`, `adicionar`, `atualizar`, `excluir`). Na migração para um back-end, preserve a interface lógica dessa camada e adapte os chamadores às operações assíncronas de API. As chaves locais usam o prefixo `admpro_`.
+- `index.html`, `css/style.css`, `js/views/`: aplicação responsiva sem build.
+- `js/auth.js`, `js/permissoes.js`: Auth, convite, papéis, seleção e revalidação de empresas.
+- `js/storage.js`: adaptador de persistência, cache local, fila offline e sincronização com RPCs.
+- `js/config.js`: endereço e **chave pública** do projeto Supabase do ambiente.
+- `supabase/migrations/`: migrations aditivas e correções da evolução; **aplicar na ordem documentada**, somente após backup e homologação.
+- `tests/browser-multiusuario.mjs`: fluxos em Chromium com Supabase simulado (não realiza confirmação de e-mail real).
+- `tests/staging-storage.mjs`, `tests/horarios.js`: testes de regressão e sincronização.
+- `.github/workflows/`: verificações de JavaScript e Chromium nos PRs.
+- `docs/multiusuario-multiprofissional.md`: arquitetura, permissões, SQL e cenários validados.
+- `docs/release-multiusuario.md`: passos de homologação, publicação e recuperação.
 
-## Observações
+O **AdmPro Console** está em repositório separado, publicado independentemente. Deve receber as migrations do mesmo Supabase **antes de ser publicado com métricas multiusuário**.
 
-Os dados permanecem no navegador/dispositivo. Faça backups regularmente. O botão “Gerar PDF” abre a impressão do navegador, onde se pode escolher **Salvar como PDF**. Mensagens de WhatsApp usam `wa.me` e requerem conexão com a internet. O sistema é local e oferece apenas PIN local (não autenticação real) e não sincroniza dispositivos.
+## Testes desta branch
+
+As verificações executadas pelo GitHub Actions são:
+
+```bash
+find js -name '*.js' -print0 | xargs -0 -n1 node --check
+node --check sw.js
+node --test tests/horarios.js
+node tests/staging-storage.mjs
+# Suíte Chromium no CI (Playwright instalado somente no ambiente de testes):
+node tests/browser-multiusuario.mjs
+```
+
+Os testes de navegador usam dados simulados, enquanto autorização/RLS, financeiro, convites e revogação são verificados separadamente no Supabase **staging**, com transações de teste revertidas. O aceite completo do convite com **segundo usuário Auth e e-mail real confirmado** permanece como etapa de homologação antes da produção.
+
+---
+
+## Histórico técnico das versões locais
+
+As seções seguintes documentam o legado offline v2/v3 e evoluções de interface. Algumas descrições de funcionamento local sem autenticação, cache e comandos de teste correspondem **somente a essas versões anteriores** e **não substituem as instruções da versão Supabase acima**.
 
 ## Marca AdmPro
 
