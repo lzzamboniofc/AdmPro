@@ -58,6 +58,7 @@ async function selecionarConta(id,{sincronizar=true}={}){
     const rp=await client().rpc('permissoes_membro',{p_conta:conta.id});
     if(rp.error)throw rp.error;permissoes=rp.data||{};
     v.permissoes_efetivas=permissoes;A.storage.guardarVinculosUsuario(usuario.id,vinculos);
+    A.storage.aplicarEscopo(permissoes,membro);
     const status=await client().rpc('atualizar_minha_assinatura',{p_conta:conta.id});
     if(status.error)console.warn('Atualização do status:',status.error.message);
     await atualizarConta();
