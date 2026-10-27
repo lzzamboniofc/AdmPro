@@ -9,6 +9,8 @@ const vm = require('node:vm');
 
 const raiz = path.resolve(__dirname, '..');
 const escopo = 'http://localhost:5500/AdmPro/';
+const CACHE_ATUAL = fs.readFileSync(path.join(raiz, 'sw.js'), 'utf8').match(/^const CACHE = '([^']+)'/m)?.[1];
+if (!CACHE_ATUAL) throw Error('Cache PWA não identificado.');
 
 function ambiente() {
     const ouvintes = new Map();
@@ -143,7 +145,7 @@ test('ativação remove cache antigo, mantém outros e assume controle', async (
     const chaves = await e.caches.keys();
     assert.ok(chaves.includes('outro-aplicativo'));
     assert.ok(!chaves.includes('admpro-estaticos-v3-2'));
-    assert.ok(chaves.includes('admpro-estaticos-v3-3'));
+    assert.ok(chaves.includes(CACHE_ATUAL));
     assert.equal(e.info().assumiuControle, true);
 });
 

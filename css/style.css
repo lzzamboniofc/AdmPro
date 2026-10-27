@@ -9,6 +9,7 @@
   --texto:#1A2328;
   --texto-secundario:#5D6B73;
   --sucesso:#16A34A;
+  --sucesso-texto:#137A38;
   --alerta:#D97706;
   --erro:#DC2626;
   --sombra:0 1px 3px rgba(0,0,0,.06)
@@ -16,6 +17,7 @@
 [data-theme="dark"] {
   color-scheme:dark;
   --primaria:#5BC2D6;
+  --sucesso-texto:#4ADE80;
   --primaria-hover:#5BB8CB;
   --primaria-suave:#16313A;
   --fundo:#0F1518;
@@ -29,6 +31,7 @@
   [data-theme="auto"] {
     color-scheme:dark;
     --primaria:#5BC2D6;
+    --sucesso-texto:#4ADE80;
     --primaria-hover:#5BB8CB;
     --primaria-suave:#16313A;
     --fundo:#0F1518;
@@ -196,7 +199,7 @@ small,.muted {
   color:var(--erro)
 }
 .resumo-valor.success,.success {
-  color:var(--sucesso)
+  color:var(--sucesso-texto)
 }
 .list-card {
   display:flex;
@@ -1143,3 +1146,73 @@ body.modal-aberto .modal-layer { overscroll-behavior:contain; }
 .segmeneted, .segmented { max-width:100%; overflow-x:auto; }
 @media (min-width:768px) { .modelos-grade { grid-template-columns:repeat(4,minmax(0,1fr)); } }
 @media (prefers-reduced-motion:reduce) { .meta-progresso { transition:none; } }
+
+/* Ajustes de consistência visual auditados em 360, 390, 768 e 1280px. */
+.meta-destaque { margin-bottom:16px; }
+.meta-destaque + .card { margin-bottom:16px; }
+.section > h2 { margin-bottom:12px; }
+.card > h2 { margin-bottom:12px; }
+.card > h2:not(:first-child) { margin-top:24px; }
+.section-heading a, .text-button {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:44px;
+  padding:4px;
+  flex-shrink:0;
+}
+/* Dias de atendimento parecem chips, não checkboxes nativos ampliados. */
+.dias { gap:2px; }
+.dias label {
+  position:relative;
+  min-width:0;
+  min-height:44px;
+  cursor:pointer;
+  color:var(--texto-secundario);
+  font-weight:600;
+}
+.dias label:has(input:checked) { color:var(--primaria); }
+.dias label input {
+  position:absolute;
+  width:1px;
+  height:1px;
+  min-height:0;
+  opacity:0;
+  padding:0;
+  margin:0;
+  pointer-events:none;
+}
+.dias label:has(input:focus-visible) {
+  outline:3px solid var(--primaria);
+  outline-offset:3px;
+}
+/* Três números do Financeiro: saldo ocupa toda a linha no celular. */
+@media (max-width:767px) {
+  .financeiro-resumo > .card:last-child:nth-child(odd) { grid-column:1 / -1; }
+  .financeiro-tabs { display:flex; width:calc(100% - 72px); min-width:0; }
+  .financeiro-tabs button { flex:1 1 0; min-width:0; padding-inline:4px; font-size:12px; white-space:nowrap; }
+  .financeiro-tabs button:first-child { flex-grow:1.3; }
+}
+@media (min-width:768px) {
+  .financeiro-resumo { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+/* Controle de upload segue o mesmo vocabulário visual dos demais campos. */
+.field input[type="file"] { padding:4px; min-width:0; }
+.field input[type="file"]::file-selector-button {
+  min-height:38px;
+  border:1px solid var(--borda);
+  border-radius:8px;
+  margin-right:12px;
+  padding:6px 12px;
+  background:var(--primaria-suave);
+  color:var(--texto);
+  font:inherit;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+}
+
+/* Semana legível no início do layout com sidebar: 7 colunas ficam estreitas a 1024px. */
+@media (min-width:1024px) and (max-width:1279px) {
+  .semana { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}

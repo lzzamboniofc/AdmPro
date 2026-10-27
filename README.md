@@ -62,7 +62,7 @@ O aplicativo continua abrindo por `file://` (sem service worker). O service work
 
 1. Abra esta pasta no VS Code e escolha **Live Server → Open with Live Server**, ou execute `npx serve .` no terminal (o segundo comando exige Node/npm e pode baixar o pacote `serve`, mas **não é uma dependência do AdmPro**).
 2. Acesse o endereço local informado pelo servidor (por exemplo, `http://localhost:5500/index.html`).
-3. Abra uma vez com conexão de rede disponível. Confirme em DevTools → Application → Service Workers que `sw.js` está ativo. Em Application → Cache Storage, confira `admpro-estaticos-v3-3`.
+3. Abra uma vez com conexão de rede disponível. Confirme em DevTools → Application → Service Workers que `sw.js` está ativo. Em Application → Cache Storage, confira `admpro-estaticos-v3-4`.
 4. Vá a Configurações → Instalação e escolha **Instalar app**, se disponível. No Safari do iPhone use **Compartilhar → Adicionar à Tela de Início**.
 5. Em DevTools → Network, ative **Offline** e recarregue: os arquivos estáticos devem permanecer disponíveis. Os dados continuam exclusivamente neste navegador.
 6. Ao atualizar o projeto, altere o valor de `CACHE` em `sw.js` para forçar o navegador a preparar a nova versão. A confirmação **Atualizar** ativa a versão que está aguardando.
@@ -94,3 +94,9 @@ node --test tests/*.js
 Os testes verificam migração v2→v3, retenção de dados diante de JSON inválido, importação de backup, recorrência, controle de estoque, recebimentos, despesas fixas e valores monetários. `tests/pwa.js` simula instalação, leitura do cache em modo offline, fallback de navegação pela raiz, limpeza de cache antigo e atualização do service worker. Esses testes isolados não substituem a instalação real em Android, iOS ou Chrome local. `tests/` não faz parte dos scripts carregados pelo `index.html` e não é necessário para usar o aplicativo.
 
 Na migração, `storage.js` verifica se há coleções corrompidas antes de gravar e só marca a nova versão depois de converter os dados. Se encontrar um JSON inválido, a migração é adiada e o conteúdo original é preservado para possível recuperação por backup. Evite criar novos cadastros antes de restaurar o armazenamento corrompido.
+
+## Revisão visual (v3.4)
+
+A auditoria das interfaces em 360, 390, 768 e 1280px identificou e corrigiu: chips de dias de atendimento antes visualizados como checkboxes enormes; espaçamento insuficiente entre meta e indicadores; saldo isolado em meia coluna no Financeiro; abas do Financeiro encobertas pelo botão de ação; links com áreas clicáveis menores que 44px; contraste insuficiente do verde em valores positivos; e agrupamento da agenda semanal estreito na transição desktop. Foram mantidos os códigos de cor oficiais para status, o azul-petróleo e a organização original de telas. O cache PWA foi incrementado para `admpro-estaticos-v3-4`.
+
+O relatório de inspeção e as limitações dos testes estão em [`docs/auditoria-visual.md`](docs/auditoria-visual.md).
