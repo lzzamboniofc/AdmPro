@@ -477,6 +477,18 @@
             throw Error('Seu perfil só pode atualizar o status e o lembrete dos próprios atendimentos.');
         }
       }
+      if(A.permissoes?.pode){
+        const exigida={
+          config:'config.editar',clientes:'clientes.editar',catalogo:'catalogo.editar',
+          profissionais:'equipe.editar',despesasFixas:'financeiro.editar',
+          movimentacoesEstoque:'estoque.editar'
+        }[colecao];
+        if(exigida&&!A.permissoes.pode(exigida))throw Error('Seu perfil não possui permissão para alterar estes dados.');
+        if(colecao==='lancamentos'&&!A.permissoes.pode('financeiro.editar')&&!A.permissoes.pode('financeiro.receber'))
+          throw Error('Seu perfil não possui permissão para registrar movimentações financeiras.');
+        if(colecao==='servicos'&&!operacional&&!A.permissoes.pode('agenda.editar'))
+          throw Error('Seu perfil não possui permissão para alterar atendimentos.');
+      }
       const plano=A.auth?.conta?.planos||{};
       if(colecao==='clientes'&&Array.isArray(novo)&&plano.limite_clientes!=null&&novo.length>plano.limite_clientes){
         A.ui?.modal('Limite de clientes','<p>Seu plano permite até '+plano.limite_clientes+' clientes.</p><a class="btn" href="#/assinatura">Assinar o Pro</a>');
