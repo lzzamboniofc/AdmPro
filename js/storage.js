@@ -667,7 +667,16 @@
       const permitido=new Set(['nome_negocio','modelo_negocio','tipo_negocio','telefone','cidade','uf']);
       const dados=Object.fromEntries(Object.entries(obj).filter(([k])=>permitido.has(k)));
       if(!contaAtual||!Object.keys(dados).length)return;
-      const {error}=await A.auth.client.from('contas').update(dados).eq('id',contaAtual);
+      if(A.permissoes?.pode&&!A.permissoes.pode('config.editar'))throw Error('Seu perfil não pode alterar os dados da empresa.');
+      const {error}=await A.auth.client.rpc('atualizar_dados_empresa',{
+        p_conta:contaAtual,
+        p_nome_negocio:dados.nome_negocio??null,
+        p_modelo_negocio:dados.modelo_negocio??null,
+        p_tipo_negocio:dados.tipo_negocio??null,
+        p_telefone:dados.telefone??null,
+        p_cidade:dados.cidade??null,
+        p_uf:dados.uf??null
+      });
       if(error)throw error;
       await A.auth.atualizarConta();
     }
