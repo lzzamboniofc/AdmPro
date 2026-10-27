@@ -1,5 +1,5 @@
 /* PWA: cache-first de arquivos estáticos do mesmo escopo. Sem acesso a dados privados. */
-const CACHE = 'admpro-estaticos-v3-6';
+const CACHE = 'admpro-estaticos-v4-supabase-staging-1';
 const ARQUIVOS = [
   "./index.html",
   "./css/style.css",
@@ -7,6 +7,14 @@ const ARQUIVOS = [
   "./js/modelos.js",
   "./js/regras.js",
   "./js/storage.js",
+  "./js/config.js",
+  "./js/vendor/supabase.js",
+  "./js/auth.js",
+  "./js/views/autenticacao.js",
+  "./js/views/assinatura.js",
+  "./js/views/suporte.js",
+  "./termos.html",
+  "./privacidade.html",
   "./js/ui.js",
   "./js/utils.js",
   "./js/views/agenda.js",
@@ -89,3 +97,5 @@ self.addEventListener('fetch', evento => {
         }
     })());
 });
+
+/* ADMPRO-SUPABASE-INTEGRADO */
