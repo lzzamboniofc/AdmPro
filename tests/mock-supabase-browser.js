@@ -21,6 +21,7 @@
     'financeiro.ver','financeiro.editar','financeiro.receber','estoque.ver','estoque.editar',
     'relatorios.operacionais','config.editar','auditoria.ver','assinatura.gerenciar'
   ].map(k=>[k,true]));
+  const permissoesRecepcao={'agenda.ver_todas':true,'agenda.editar':true,'clientes.ver':true,'clientes.editar':true,'catalogo.ver':true};
   const permissoesProfissional={
     'agenda.propria':true,'atendimentos.proprios':true,'atendimentos.atualizar_proprios':true,
     'clientes.vinculados':true
@@ -47,20 +48,28 @@
     itens:[],parcelas:[],total:120,desconto:0,historico:[{status:'agendado',em:new Date().toISOString()}]
   });
   const membro=id=>({
-    conta_id:id,conta:empresas.find(x=>x.id===id),papel:perfil==='profissional'?'profissional':'dono',
+    conta_id:id,conta:empresas.find(x=>x.id===id),papel:perfil==='profissional'?'profissional':perfil==='convidado'?'recepcionista':'dono',
     profissional_id:perfil==='profissional'?'prof-ana':null,ativo:true,permissoes:{}
   });
-  const convites=[];
+  const conviteTeste='30000000-0000-4000-8000-000000000999';
+  let conviteAceito=false;
+  const convites=perfil==='convidado'?[{id:conviteTeste,email:'convidado@example.test',papel:'recepcionista',
+    conta_id:empresa1,nome_negocio:'Estúdio Principal',expira_em:new Date(Date.now()+7*86400000).toISOString()}]:[];
   function result(data=null){return {data,error:null}};
   let signed=true;
-  const user={id:uid,email:perfil==='profissional'?'ana@example.test':'dono@example.test'};
+  const user={id:uid,email:perfil==='profissional'?'ana@example.test':perfil==='convidado'?'convidado@example.test':'dono@example.test'};
   const mock={
     perfil,empresas,rows,convites,empresa1,empresa2,uid,
+    get conviteAceito(){return conviteAceito},
     async rpc(name,p={}){
-      if(name==='minhas_empresas')return result((perfil==='duas'?empresas:[empresas[0]]).map(x=>membro(x.id)));
+      if(name==='minhas_empresas')return result((perfil==='convidado'&&!conviteAceito?[]:perfil==='duas'?empresas:[empresas[0]]).map(x=>membro(x.id)));
       if(name==='minha_empresa')return result(empresas.find(x=>x.id===p.p_conta));
-      if(name==='permissoes_membro')return result(perfil==='profissional'?permissoesProfissional:permissoesDono);
-      if(name==='meus_convites_pendentes')return result([]);
+      if(name==='permissoes_membro')return result(perfil==='profissional'?permissoesProfissional:perfil==='convidado'?permissoesRecepcao:permissoesDono);
+      if(name==='meus_convites_pendentes')return result(conviteAceito?[]:convites);
+      if(name==='aceitar_convite'){
+        if(perfil==='convidado'&&p.p_convite===conviteTeste){conviteAceito=true;return result(empresa1)}
+        return {data:null,error:{message:'CONVITE_INVALIDO'}};
+      }
       if(name==='atualizar_minha_assinatura'||name==='registrar_acesso')return result();
       if(name==='sincronizar_dados'){
         const filtradas=rows.filter(x=>x.conta_id===p.p_conta&&x.atualizado_em>=p.p_cursor)
