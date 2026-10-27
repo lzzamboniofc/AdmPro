@@ -67,6 +67,7 @@ create table if not exists public.pagamentos (
   criado_em timestamptz not null default now()
 );
 create index if not exists pagamentos_conta_idx on public.pagamentos(conta_id,criado_em desc);
+create index if not exists pagamentos_criado_por_idx on public.pagamentos(criado_por);
 
 create table if not exists public.uso_diario (
   conta_id uuid not null references public.contas(id) on delete cascade,
@@ -156,8 +157,13 @@ begin
      new.trial_ate is distinct from old.trial_ate or
      new.proximo_vencimento is distinct from old.proximo_vencimento or
      new.criado_em is distinct from old.criado_em or
-     new.ultimo_acesso_em is distinct from old.ultimo_acesso_em
+     new.ultimo_acesso_em is distinct from old.ultimo_acesso_em or
+     new.versao_app is distinct from old.versao_app
   ) then raise exception 'CAMPOS_ASSINATURA_PROTEGIDOS' using errcode = '42501'; end if;
+  if current_user not in ('postgres','service_role') and not public.is_admin()
+     and old.status_assinatura = 'bloqueada' then
+    raise exception 'CONTA_BLOQUEADA' using errcode='42501';
+  end if;
   return new;
 end $$;
 drop trigger if exists admpro_proteger_conta on public.contas;
@@ -333,8 +339,7 @@ using ((select public.is_admin()));
 
 create policy "membros_ler" on public.membros for select to authenticated
 using ((select public.is_admin()) or user_id=(select auth.uid()));
-create policy "membros_admin_escrita" on public.membros for all to authenticated
-using ((select public.is_admin())) with check ((select public.is_admin()));
+-- Só a função interna de cadastro (ou o painel futuro com fluxo protegido) cria membresias.
 
 create policy "dados_privados_ler" on public.dados for select to authenticated
 using (not (select public.is_admin()) and (select public.eh_membro(conta_id)));
@@ -392,7 +397,7 @@ revoke all on public.planos,public.contas,public.membros,public.dados,public.pag
 grant usage on schema public to authenticated;
 grant select on public.planos,public.contas,public.membros,public.dados,public.pagamentos,
   public.uso_diario,public.avisos,public.feedbacks,public.config_sistema,public.admins to authenticated;
-grant insert,update,delete on public.planos,public.contas,public.membros,public.pagamentos,
+grant insert,update,delete on public.planos,public.contas,public.pagamentos,
   public.avisos,public.feedbacks,public.config_sistema,public.admins to authenticated;
 grant insert,update on public.dados to authenticated;
 -- Sem GRANT de delete em dados; sem escrita direta em uso_diario.
