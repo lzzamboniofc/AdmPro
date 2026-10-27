@@ -52,7 +52,7 @@
     profissional_id:perfil==='profissional'?'prof-ana':null,ativo:true,permissoes:{}
   });
   const conviteTeste='30000000-0000-4000-8000-000000000999';
-  let conviteAceito=false;
+  let conviteAceito=sessionStorage.getItem('__fixture_convite_aceito')==='1';
   const convites=perfil==='convidado'?[{id:conviteTeste,email:'convidado@example.test',papel:'recepcionista',
     conta_id:empresa1,nome_negocio:'Estúdio Principal',expira_em:new Date(Date.now()+7*86400000).toISOString()}]:[];
   function result(data=null){return {data,error:null}};
@@ -67,7 +67,7 @@
       if(name==='permissoes_membro')return result(perfil==='profissional'?permissoesProfissional:perfil==='convidado'?permissoesRecepcao:permissoesDono);
       if(name==='meus_convites_pendentes')return result(conviteAceito?[]:convites);
       if(name==='aceitar_convite'){
-        if(perfil==='convidado'&&p.p_convite===conviteTeste){conviteAceito=true;return result(empresa1)}
+        if(perfil==='convidado'&&p.p_convite===conviteTeste){conviteAceito=true;sessionStorage.setItem('__fixture_convite_aceito','1');return result(empresa1)}
         return {data:null,error:{message:'CONVITE_INVALIDO'}};
       }
       if(name==='atualizar_minha_assinatura'||name==='registrar_acesso')return result();
