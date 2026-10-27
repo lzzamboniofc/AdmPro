@@ -119,6 +119,8 @@ Principais arquivos:
 10. `20261027180900_professional_minimal_permissions.sql`
 11. `20261027181000_secure_company_profile.sql`
 12. `20261027181100_guard_permission_grants.sql`
+13. `20261027181200_atomic_reception_payments.sql`
+14. `20261027181300_invite_confirmed_email_guard.sql`
 
 Algumas migrations posteriores também consolidam correções feitas durante a validação no staging. Elas devem permanecer na sequência para que ambientes que já receberam uma versão anterior cheguem ao mesmo estado final.
 
@@ -177,6 +179,18 @@ O workflow `.github/workflows/browser-multiusuario.yml` usa **Chromium real com 
 No AdmPro Console, `.github/workflows/test-pr.yml` executa os testes estáticos, de templates e de integridade da biblioteca Supabase no PR sem disparar publicação em produção.
 
 **Limitação destes testes:** o navegador utiliza um Supabase simulado. Regras de RLS e RPCs foram testadas separadamente no banco de staging com transações revertidas, mas não houve uma sessão E2E completa contra o Auth real com e-mail de confirmação.
+
+## Homologação adicional de recebimentos e revogação (staging)
+
+- `financeiro.receber` não concede permissão para criar ou alterar lançamentos financeiros genéricos. Para registrar pagamentos de atendimento, a recepção usa `registrar_recebimento_atendimento`, que grava receita e parcela dentro de **uma única transação PostgreSQL**.
+- O backend valida vínculo ativo, parcelas, valor, status e método de pagamento, impedindo duplicação do mesmo recebimento. Nos testes transacionais, duas parcelas produziram exatamente duas entradas e o atendimento ficou `pago`.
+- Perfis com apenas permissão de recebimento não podem estornar pagamentos nem editar livremente lançamentos financeiros. A operação exige internet; se houver mudanças locais pendentes, elas precisam ser sincronizadas primeiro.
+- Um convite não pode substituir as permissões de um membro já ativo (incluindo proprietário). O aceite exige e-mail confirmado no Supabase Auth.
+- A revalidação de vínculo/permissões acontece na reconexão e quando a aba volta ao primeiro plano. Ao detectar revogação, o cache da empresa é apagado. Ao detectar alteração de permissões, dados antigos são descartados e relidos pelas RPCs sanitizadas. **Enquanto o dispositivo estiver realmente offline, não existe revogação instantânea de uma sessão previamente armazenada; a revogação passa a valer após reconexão.**
+- Todos os testes SQL de recebimento, duplicidade, permissão de recepção, bloqueio de convite antigo, revogação de vínculo e negação das RPCs foram executados com `ROLLBACK`.
+- O E2E em Chromium com mock agora inclui recepção, tentativa de acesso a Financeiro, revogação na reconexão e rebaixamento de permissões com limpeza do cache.
+
+**Limite de homologação Auth:** o staging possui apenas um usuário Auth confirmado, portanto o teste com dois usuários reais e confirmação de um novo e-mail ainda não foi executado. O E2E de aceite funciona com Auth simulado, e as validações de aceite e autorização do banco foram testadas com SQL transacional. Para homologação real completa, usar um segundo usuário de testes controlado, com e-mail acessível, e verificar a confirmação e o aceite na aplicação publicada em ambiente de staging.
 
 ## Validação ainda recomendada antes de produção
 
