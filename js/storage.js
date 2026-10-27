@@ -376,6 +376,29 @@
       encerrarSessao();contaAtual=null;usuarioAtual=null;falhaSync='';avisosAtivos=[];ultimoAcesso=0;
       atualizarIndicador();
     }
+    function aplicarEscopo(perms={},membro={}){
+      if(!contaAtual||navigator.onLine===false)return;
+      const remover=col=>localStorage.removeItem(chaveCache(col));
+      if(!perms['financeiro.ver']){remover('lancamentos');remover('despesasFixas')}
+      if(!perms['estoque.ver'])remover('movimentacoesEstoque');
+      if(!perms['catalogo.ver'])remover('catalogo');
+      if(!perms['equipe.ver'])remover('profissionais');
+      if(!perms['clientes.ver'])remover('clientes');
+      if(!perms['agenda.ver_todas']&&!perms['atendimentos.ver_todos'])remover('servicos');
+      const podeEscrever={
+        config:!!perms['config.editar'],
+        clientes:!!perms['clientes.editar'],
+        catalogo:!!perms['catalogo.editar'],
+        profissionais:!!perms['equipe.editar'],
+        lancamentos:!!perms['financeiro.editar']||!!perms['financeiro.receber'],
+        despesasFixas:!!perms['financeiro.editar'],
+        movimentacoesEstoque:!!perms['estoque.editar'],
+        servicos:!!perms['agenda.editar']
+      };
+      const atual=fila(),filtrada=atual.filter(x=>podeEscrever[x.colecao]!==false);
+      if(filtrada.length!==atual.length)salvarJSON(filaKey(),filtrada);
+      atualizarIndicador();
+    }
     function novaData(){relogio=Math.max(Date.now(),relogio+1);return new Date(relogio).toISOString()}
     function seguro(colecao,item){
       const v=copiar(item);
@@ -563,7 +586,7 @@
     function vinculosCacheUsuario(userId){return carregarJSON(PREFIXO+'vinculos_'+userId,[])}
     function definirContaPreferida(userId,contaId){localStorage.setItem(PREFIXO+'contaPreferida_'+userId,contaId)}
     function contaPreferida(userId){return localStorage.getItem(PREFIXO+'contaPreferida_'+userId)||''}
-    A.storage = { obter, gravar, lista, porId, adicionar, atualizar, excluir, removerServico, exportar, validarBackup, importar, limpar, exemplo, problemas, migrarDados, hashPin, verificarPin, definirPin, sessaoAtiva, abrirSessao, encerrarSessao, bloqueioRestante, registrarErroPin, registrarPagamento, estornarPagamento, movimentarEstoque, sincronizarServico, consumirRecorrente, gerarDespesasFixas, numeroRecibo, registrarLembrete, usarConta, limparCacheConta, pendentes, estadoSync, sincronizar, registrarAcesso, dadosAssinatura, carregarAvisos, avisosHTML, bindAvisos, enviarFeedback, listarFeedbacks, atualizarDadosConta, possuiLegado, importarLegado, guardarContaUsuario, contaCacheUsuario, guardarVinculosUsuario, vinculosCacheUsuario, definirContaPreferida, contaPreferida };
+    A.storage = { obter, gravar, lista, porId, adicionar, atualizar, excluir, removerServico, exportar, validarBackup, importar, limpar, exemplo, problemas, migrarDados, hashPin, verificarPin, definirPin, sessaoAtiva, abrirSessao, encerrarSessao, bloqueioRestante, registrarErroPin, registrarPagamento, estornarPagamento, movimentarEstoque, sincronizarServico, consumirRecorrente, gerarDespesasFixas, numeroRecibo, registrarLembrete, usarConta, limparCacheConta, pendentes, estadoSync, sincronizar, registrarAcesso, dadosAssinatura, carregarAvisos, avisosHTML, bindAvisos, enviarFeedback, listarFeedbacks, atualizarDadosConta, possuiLegado, importarLegado, guardarContaUsuario, contaCacheUsuario, guardarVinculosUsuario, vinculosCacheUsuario, definirContaPreferida, contaPreferida, aplicarEscopo };
 })(window.AdmPro = window.AdmPro || {});
 
 /* ADMPRO-SUPABASE-INTEGRADO */
