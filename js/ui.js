@@ -102,29 +102,57 @@
     const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
     function editorHorarios(config) {
         const semana = A.regras.horariosSemana(config);
-        return `<fieldset class="horarios-editor"><legend>Horários por dia</legend><p class="muted">Desative dias de folga ou configure manhã e tarde com intervalo para almoço.</p>${semana.map((d,i) => {
-            const a = d.turnos[0] || { inicio:'08:00', fim:'12:00' };
-            const b = d.turnos[1] || { inicio:'13:00', fim:'18:00' };
-            return `<div class="horario-dia" data-dia="${i}"><label class="horario-toggle"><input type="checkbox" name="diaAtivo${i}" ${d.ativo?'checked':''}><strong>${DIAS[i]}</strong><span class="horario-estado">${d.ativo?'Aberto':'Fechado'}</span></label><div class="horario-turnos" ${d.ativo?'':'hidden'}><div class="horario-turno"><span>1º período</span><input aria-label="Início do primeiro período de ${DIAS[i]}" type="time" name="inicio1_${i}" value="${a.inicio}" required><span>até</span><input aria-label="Fim do primeiro período de ${DIAS[i]}" type="time" name="fim1_${i}" value="${a.fim}" required></div><label class="check-row horario-pausa"><input type="checkbox" name="segundo${i}" ${d.turnos.length>1?'checked':''}>Adicionar 2º período (após almoço)</label><div class="horario-turno" data-turno2 ${d.turnos.length>1?'':'hidden'}><span>2º período</span><input aria-label="Início do segundo período de ${DIAS[i]}" type="time" name="inicio2_${i}" value="${b.inicio}"><span>até</span><input aria-label="Fim do segundo período de ${DIAS[i]}" type="time" name="fim2_${i}" value="${b.fim}"></div></div></div>`;
+        const turno=(i,t,n)=>`<div class="horario-turno" data-turno><span>Período ${n+1}</span><input aria-label="Início do período ${n+1} de ${DIAS[i]}" type="time" data-inicio value="${t.inicio}" required><span>até</span><input aria-label="Fim do período ${n+1} de ${DIAS[i]}" type="time" data-fim value="${t.fim}" required><button type="button" class="icon-button" data-remover-turno aria-label="Remover período">${icon('trash')}</button></div>`;
+        return `<fieldset class="horarios-editor"><legend>Horários por dia</legend><p class="muted">Crie quantos períodos precisar para representar almoço, pausas e jornadas diferentes.</p>${semana.map((d,i) => {
+            const turnos=d.turnos?.length?d.turnos:[{inicio:'08:00',fim:'12:00'},{inicio:'13:00',fim:'18:00'}];
+            return `<div class="horario-dia" data-dia="${i}"><label class="horario-toggle"><input type="checkbox" name="diaAtivo${i}" ${d.ativo?'checked':''}><strong>${DIAS[i]}</strong><span class="horario-estado">${d.ativo?'Aberto':'Fechado'}</span></label><div class="horario-turnos" ${d.ativo?'':'hidden'}><div class="horario-turnos-list">${turnos.map((t,n)=>turno(i,t,n)).join('')}</div><button type="button" class="btn secundario compacto" data-adicionar-turno>+ Adicionar período</button></div></div>`;
         }).join('')}<p class="field-error" data-erro-horarios role="alert"></p></fieldset>`;
     }
     function ativarEditorHorarios(root) {
         root.querySelectorAll('.horario-dia').forEach(dia => {
-            const ativo=dia.querySelector('[name^="diaAtivo"]'), turno2=dia.querySelector('[name^="segundo"]');
-            const atualizar=()=>{dia.querySelector('.horario-turnos').hidden=!ativo.checked;dia.querySelector('[data-turno2]').hidden=!turno2.checked;dia.querySelector('.horario-estado').textContent=ativo.checked?'Aberto':'Fechado';
-                dia.querySelectorAll('input[type="time"]').forEach(input=>{ input.disabled=!ativo.checked || (input.closest('[data-turno2]') && !turno2.checked); });};
-            ativo.addEventListener('change', atualizar); turno2.addEventListener('change', atualizar); atualizar();
+            const ativo=dia.querySelector('[name^="diaAtivo"]'),lista=dia.querySelector('.horario-turnos-list'),i=Number(dia.dataset.dia);
+            const renumerar=()=>lista.querySelectorAll('[data-turno]').forEach((row,n)=>{
+                row.querySelector('span').textContent='Período '+(n+1);
+                row.querySelector('[data-inicio]').setAttribute('aria-label','Início do período '+(n+1)+' de '+DIAS[i]);
+                row.querySelector('[data-fim]').setAttribute('aria-label','Fim do período '+(n+1)+' de '+DIAS[i]);
+                row.querySelector('[data-remover-turno]').hidden=lista.querySelectorAll('[data-turno]').length===1;
+            });
+            const atualizar=()=>{
+                dia.querySelector('.horario-turnos').hidden=!ativo.checked;
+                dia.querySelector('.horario-estado').textContent=ativo.checked?'Aberto':'Fechado';
+                dia.querySelectorAll('input[type="time"]').forEach(input=>input.disabled=!ativo.checked);
+                dia.querySelector('[data-adicionar-turno]').disabled=!ativo.checked;
+                renumerar();
+            };
+            ativo.addEventListener('change',atualizar);
+            dia.querySelector('[data-adicionar-turno]').addEventListener('click',()=>{
+                const rows=[...lista.querySelectorAll('[data-turno]')],ultimo=rows.at(-1);
+                const inicio=ultimo?.querySelector('[data-fim]')?.value||'13:00';
+                let fim='18:00';
+                const m=A.utils.horaMinutos(inicio)+240;
+                if(m<24*60)fim=A.utils.dois(Math.floor(m/60))+':'+A.utils.dois(m%60);
+                lista.insertAdjacentHTML('beforeend',`<div class="horario-turno" data-turno><span>Período</span><input type="time" data-inicio value="${inicio}" required><span>até</span><input type="time" data-fim value="${fim}" required><button type="button" class="icon-button" data-remover-turno aria-label="Remover período">${icon('trash')}</button></div>`);
+                atualizar();
+            });
+            lista.addEventListener('click',e=>{
+                const b=e.target.closest('[data-remover-turno]');if(!b)return;
+                if(lista.querySelectorAll('[data-turno]').length<=1)return;
+                b.closest('[data-turno]').remove();renumerar();
+            });
+            atualizar();
         });
     }
     function lerEditorHorarios(form) {
         const semana=[];
         for(let i=0;i<7;i++) {
-            const ativo=form.elements[`diaAtivo${i}`].checked;
-            const turnos=[];
+            const dia=form.querySelector(`.horario-dia[data-dia="${i}"]`),ativo=dia.querySelector('[name^="diaAtivo"]').checked;
+            let turnos=[];
             if(ativo) {
-                turnos.push({inicio:form.elements[`inicio1_${i}`].value,fim:form.elements[`fim1_${i}`].value});
-                if(form.elements[`segundo${i}`].checked) turnos.push({inicio:form.elements[`inicio2_${i}`].value,fim:form.elements[`fim2_${i}`].value});
-                if(turnos.some(t=>!t.inicio||!t.fim||t.inicio>=t.fim) || (turnos[1] && turnos[0].fim>turnos[1].inicio))
+                turnos=[...dia.querySelectorAll('[data-turno]')].map(row=>({inicio:row.querySelector('[data-inicio]').value,fim:row.querySelector('[data-fim]').value}));
+                if(!turnos.length||turnos.some(t=>!t.inicio||!t.fim||t.inicio>=t.fim))
+                    throw Error(`Revise os horários de ${DIAS[i]}; cada período precisa ter início e fim válidos.`);
+                turnos.sort((a,b)=>a.inicio.localeCompare(b.inicio));
+                for(let n=1;n<turnos.length;n++)if(turnos[n-1].fim>turnos[n].inicio)
                     throw Error(`Revise os horários de ${DIAS[i]}; períodos não podem se cruzar.`);
             }
             semana.push({ativo,turnos});
