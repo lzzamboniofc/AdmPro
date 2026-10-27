@@ -62,7 +62,7 @@ function opProfissionais(selecionado=''){
 }
 function permissoesExtras(obj={}){
  return '<fieldset class="permissoes-grid"><legend>Permissões adicionais</legend>'+
- ['financeiro.ver|Ver financeiro','financeiro.editar|Editar financeiro','relatorios.operacionais|Ver relatórios operacionais','config.editar|Editar configurações'].map(x=>{const [k,n]=x.split('|');return '<label class="check-row"><input type="checkbox" data-permissao="'+k+'" '+(obj[k]===true?'checked':'')+'> '+n+'</label>'}).join('')+'</fieldset>';
+ ['agenda.ver_todas|Ver todas as agendas','clientes.ver|Ver todos os clientes','catalogo.ver|Ver catálogo','financeiro.receber|Registrar recebimentos','financeiro.ver|Ver financeiro','financeiro.editar|Editar financeiro','estoque.ver|Ver estoque','estoque.editar|Editar estoque','relatorios.operacionais|Ver relatórios operacionais','config.editar|Editar configurações'].map(x=>{const [k,n]=x.split('|');return '<label class="check-row"><input type="checkbox" data-permissao="'+k+'" '+(obj[k]===true?'checked':'')+'> '+n+'</label>'}).join('')+'</fieldset>';
 }
 function extrasDo(sheet){const o={};sheet.querySelectorAll('[data-permissao]').forEach(c=>{if(c.checked)o[c.dataset.permissao]=true});return o}
 function linkConvite(id){
