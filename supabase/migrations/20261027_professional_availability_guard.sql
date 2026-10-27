@@ -1,4 +1,4 @@
--- Aplica validação server-side de jornada, pausas e bloqueios individuais.
+-- Corrige e consolida a validação server-side de jornada e bloqueios individuais.
 -- Validação server-side da jornada individual e bloqueios do profissional.
 create or replace function private.hora_minutos(p_hora text) returns integer
 language plpgsql immutable set search_path='' as $$
@@ -57,7 +57,6 @@ begin
     return false;
   end if;
 
-  -- Compatibilidade com configurações antigas, anteriores a horariosSemana.
   if v_config is null then
     select d.dados into v_config from public.dados d
      where d.conta_id=p_conta and d.colecao='config' and not d.excluido
@@ -74,10 +73,8 @@ begin
       return v_ini>=v_inicio_turno and v_fim<=v_fim_turno;
     end if;
   end if;
-
   return true;
-exception when others then
-  return false;
+exception when others then return false;
 end $$;
 revoke all on function private.hora_minutos(text),private.profissional_disponivel(uuid,text,date,text,integer)
 from public,anon,authenticated;
@@ -115,6 +112,14 @@ begin
     v_prof:=nullif(new.dados->>'profissionalId','');
     if v_prof is not null and (new.dados->>'data') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
       and (new.dados->>'hora') ~ '^[0-9]{2}:[0-9]{2}$' then
+      v_dur:=case when coalesce(new.dados->>'duracaoMin','') ~ '^[0-9]+$'
+        then greatest(1,least(1440,(new.dados->>'duracaoMin')::integer)) else 60 end;
+      if not exists(select 1 from public.dados where conta_id=new.conta_id and colecao='profissionais' and id=v_prof and not excluido) then
+        if tg_op='INSERT' then raise exception 'PROFISSIONAL_INVALIDO' using errcode='P0001'; end if;
+        if nullif(old.dados->>'profissionalId','') is distinct from v_prof then raise exception 'PROFISSIONAL_INVALIDO' using errcode='P0001'; end if;
+      elsif not private.profissional_disponivel(new.conta_id,v_prof,(new.dados->>'data')::date,new.dados->>'hora',v_dur) then
+        raise exception 'PROFISSIONAL_INDISPONIVEL' using errcode='P0001';
+      end if;
       select coalesce((dados->>'atendimentoSimultaneo')::boolean,false) into v_simultaneo
       from public.dados where conta_id=new.conta_id and colecao='profissionais' and id=v_prof and not excluido;
       if not coalesce(v_simultaneo,false) then
