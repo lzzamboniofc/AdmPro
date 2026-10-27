@@ -50,6 +50,7 @@
                 const credenciais = await A.storage.hashPin(pin);
                 A.storage.gravar('config', { ...rascunho, logoBase64:'', tema:'auto', metaMensal:0, reciboSequencia:0, versaoDados:3, ...credenciais });
                 if (usarExemplo) A.storage.exemplo(rascunho.tipoNegocio);
+                A.storage.atualizarDadosConta({nome_negocio:rascunho.nomeNegocio,modelo_negocio:rascunho.modeloNegocio,tipo_negocio:rascunho.tipoNegocio,telefone:rascunho.telefone}).catch(err=>UI.toast(err.message));
                 A.storage.abrirSessao(); passo = 1; A.app.iniciar(); UI.toast('Seu negócio está pronto!');
             } catch (erro) { root.querySelector('#pin-erro-inicial').textContent = erro.message; btn.disabled = false; }
         });
@@ -57,3 +58,5 @@
     A.views = A.views || {};
     A.views.onboarding = { render, bind };
 })(window.AdmPro = window.AdmPro || {});
+
+/* ADMPRO-SUPABASE-INTEGRADO */

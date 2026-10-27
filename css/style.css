@@ -1323,3 +1323,28 @@ body.modal-aberto { position:static; top:auto!important; width:auto; overflow:hi
 .pin-pontos span { display:block; width:52px; height:58px; border:2px solid var(--borda); border-radius:12px; background:var(--superficie); position:relative; }
 .pin-pontos span.preenchido::after { content:'●'; position:absolute; inset:0; display:grid; place-items:center; color:var(--texto); font-size:17px; }
 .tela-seguranca form:focus-within .pin-pontos span { border-color:var(--primaria); }
+
+/* Supabase: autenticação, assinatura, sincronização e avisos */
+.admpro-aviso{position:relative;z-index:20;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;background:var(--surface,#fff);border:1px solid #94bbc1;padding:14px 16px;border-radius:12px;margin-bottom:12px;box-shadow:0 4px 18px #00000013}
+.admpro-aviso.alerta,.admpro-banner.alerta{border-color:#dfb66c;background:#fff8e9;color:#543a12}
+.admpro-aviso p{margin:4px 0 0;white-space:pre-wrap}
+.admpro-banner{padding:11px 14px;border:1px solid #a2b9c0;border-radius:10px;margin-bottom:14px;background:#f0fafb}
+.auth-page{min-height:85vh}.auth-links{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px}.auth-links button{background:transparent;border:0;text-decoration:underline;color:inherit;cursor:pointer}
+.auth-aceite{display:flex;align-items:center;gap:10px;line-height:1.5}.auth-aceite input{width:auto;flex-shrink:0}
+#indicador-sync{font-size:.73rem;max-width:170px;line-height:1.25;white-space:normal}
+.resposta-suporte{background:#eff8f9;border-left:3px solid #0e5a6b;padding:12px;margin-top:8px}
+@media(max-width:650px){#indicador-sync{max-width:100px;font-size:.66rem}}
+
+/* ADMPRO-SUPABASE-INTEGRADO */
+
+/* Multiusuário / multiprofissional */
+.empresa-card{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;min-height:64px;padding:12px 14px;border:1px solid var(--borda);border-radius:12px;background:var(--superficie);color:var(--texto);text-align:left}
+.empresa-card span:first-child{display:grid;gap:4px}.empresa-card small{color:var(--texto-secundario)}.empresa-card.ativo{border-color:var(--primaria);background:var(--primaria-suave)}
+.cor-profissional{display:inline-block;width:12px;height:12px;border-radius:999px;flex:none}
+.check-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px}
+.permissoes-grid{border:1px solid var(--borda);border-radius:12px;padding:12px}.permissoes-grid legend{font-weight:700;padding:0 6px}
+.agenda-profissionais{display:grid;gap:12px}.agenda-coluna{min-width:0;border:1px solid var(--borda);border-radius:12px;padding:12px;background:var(--superficie)}
+.agenda-coluna>h3{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+@media(min-width:1024px){.agenda-profissionais{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}}
+
+.foto-profissional{width:40px;height:40px;flex:none;object-fit:cover;border-radius:999px;border:2px solid var(--borda)}

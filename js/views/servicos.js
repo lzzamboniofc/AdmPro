@@ -8,8 +8,13 @@
     const cliente = id => S.porId('clientes', id);
     const somenteAtivos = () => S.lista('catalogo').filter(c => c.ativo);
     const opcoesPagamento = () => MEIOS.map(([value, label]) => ({ value, label }));
+    const podeValores=()=>A.permissoes.pode('financeiro.ver')||A.permissoes.pode('financeiro.receber')||A.permissoes.pode('financeiro.editar');
+    const podeReceber=()=>A.permissoes.pode('financeiro.receber')||A.permissoes.pode('financeiro.editar');
+    const podeEditarAtendimento=()=>A.permissoes.pode('agenda.editar');
+    const podeAtualizarStatus=()=>podeEditarAtendimento()||A.permissoes.pode('atendimentos.atualizar_proprios');
+    const rotuloAcao=()=>!podeEditarAtendimento()&&A.permissoes.pode('atendimentos.atualizar_proprios')?'Atualizar status':A.perfil.botaoCard;
     function render() { return `<div class="page-heading"><div><h1>${A.perfil.plural}</h1><p class="muted">Orçamentos, compromissos e recebimentos.</p></div></div><div class="chips" aria-label="Filtrar por status">${['todos', ...STATUS].map(s => `<button type="button" class="chip filtro" data-filtro="${s}" aria-pressed="${filtro === s}">${s === 'todos' ? 'Todos' : UI.chip(s).replace(/<[^>]*>/g, '')}</button>`).join('')}</div><div class="field search-wrap"><label for="buscar-servicos">Buscar ${A.perfil.rotulo.toLowerCase()}</label><input id="buscar-servicos" placeholder="Título ou cliente" value="${U.escapar(busca)}"></div><div id="lista-servicos" class="stack">${listar()}</div>`; }
-    function listar() { const lista = S.lista('servicos').filter(s => (filtro === 'todos' || s.status === filtro) && (s.titulo + ' ' + (cliente(s.clienteId)?.nome || '')).toLocaleLowerCase('pt-BR').includes(busca.toLocaleLowerCase('pt-BR'))).sort((a, b) => b.data.localeCompare(a.data) || a.hora.localeCompare(b.hora)); return lista.length ? lista.map(s => UI.card(`<div class="list-card"><div class="grow"><h3>${U.escapar(s.titulo)}</h3><p class="item-meta">${U.escapar(cliente(s.clienteId)?.nome || 'Cliente')} · ${U.exibirData(s.data)} ${U.escapar(s.hora || '')}</p><p class="numero destaque" style="margin-top:8px">${U.dinheiro(s.total)}</p></div>${UI.chip(s.status)}</div>${s.recorrencia?.ativa ? '<span class="badge-sutil">↻ Recorrente</span>' : ''}<div class="actions"><button type="button" class="btn secundario compacto" data-abrir="${U.escapar(s.id)}">Detalhes</button>${s.status !== 'pago' && s.status !== 'cancelado' ? `<button type="button" class="btn compacto" data-avancar="${U.escapar(s.id)}">${A.perfil.botaoCard}</button>` : ''}</div>`)).join('') : (busca || filtro !== 'todos' ? UI.vazio('Nenhum resultado', 'Tente outro termo ou remova o filtro.', 'Limpar filtros', 'limparFiltros') : UI.vazio('Nenhum registro cadastrado', 'Cadastre um novo ' + A.perfil.rotulo.toLowerCase() + ' para começar.', 'Novo ' + A.perfil.rotulo.toLowerCase(), 'novoServico')); }
+    function listar() { const lista = S.lista('servicos').filter(s => (filtro === 'todos' || s.status === filtro) && (s.titulo + ' ' + (cliente(s.clienteId)?.nome || '')).toLocaleLowerCase('pt-BR').includes(busca.toLocaleLowerCase('pt-BR'))).sort((a, b) => b.data.localeCompare(a.data) || a.hora.localeCompare(b.hora)); return lista.length ? lista.map(s => UI.card(`<div class="list-card"><div class="grow"><h3>${U.escapar(s.titulo)}</h3><p class="item-meta">${U.escapar(cliente(s.clienteId)?.nome || 'Cliente')} · ${U.exibirData(s.data)} ${U.escapar(s.hora || '')}</p>${podeValores()?`<p class="numero destaque" style="margin-top:8px">${U.dinheiro(s.total)}</p>`:''}</div>${UI.chip(s.status)}</div>${s.recorrencia?.ativa ? '<span class="badge-sutil">↻ Recorrente</span>' : ''}<div class="actions"><button type="button" class="btn secundario compacto" data-abrir="${U.escapar(s.id)}">Detalhes</button>${s.status !== 'pago' && s.status !== 'cancelado' && podeAtualizarStatus() ? `<button type="button" class="btn compacto" data-avancar="${U.escapar(s.id)}">${rotuloAcao()}</button>` : ''}</div>`)).join('') : (busca || filtro !== 'todos' ? UI.vazio('Nenhum resultado', 'Tente outro termo ou remova o filtro.', 'Limpar filtros', 'limparFiltros') : UI.vazio('Nenhum registro cadastrado', 'Cadastre um novo ' + A.perfil.rotulo.toLowerCase() + ' para começar.', 'Novo ' + A.perfil.rotulo.toLowerCase(), 'novoServico')); }
     function bind(root) { root.querySelector('#buscar-servicos').oninput = e => { busca = e.target.value; root.querySelector('#lista-servicos').innerHTML = listar(); }; root.addEventListener('click', e => { const f = e.target.closest('[data-filtro]'), d = e.target.closest('[data-abrir]'), av = e.target.closest('[data-avancar]'); if (f) {
         filtro = f.dataset.filtro;
         A.app.refresh();
@@ -17,8 +22,21 @@
         A.app.ir('#/servicos/' + encodeURIComponent(d.dataset.abrir)); if (av)
         acaoPrincipal(av.dataset.avancar); if (e.target.closest('[data-action="novoServico"]')) abrirForm();
         if (e.target.closest('[data-action="limparFiltros"]')) { filtro = 'todos'; busca = ''; A.app.refresh(); root.querySelector('#buscar-servicos')?.focus(); } }); }
-    function conflito(dados, id) { if (!dados.data || !dados.hora || dados.status === 'cancelado')
-        return false; const inicio = U.horaMinutos(dados.hora), fim = inicio + Number(dados.duracaoMin || 60); return S.lista('servicos').some(s => s.id !== id && s.data === dados.data && s.status !== 'cancelado' && s.hora && inicio < U.horaMinutos(s.hora) + Number(s.duracaoMin || 60) && U.horaMinutos(s.hora) < fim); }
+    function conflito(dados, id) {
+        if (!dados.data || !dados.hora || dados.status === 'cancelado' || !dados.profissionalId) return false;
+        const profissional=S.porId('profissionais',dados.profissionalId);
+        if(profissional?.atendimentoSimultaneo)return false;
+        const inicio=U.horaMinutos(dados.hora),fim=inicio+Number(dados.duracaoMin||60);
+        return S.lista('servicos').some(s=>s.id!==id&&s.data===dados.data&&s.status!=='cancelado'&&s.hora&&s.profissionalId===dados.profissionalId&&inicio<U.horaMinutos(s.hora)+Number(s.duracaoMin||60)&&U.horaMinutos(s.hora)<fim);
+    }
+    function horarioProfissionalDisponivel(profissionalId,data,hora,duracao){
+        const p=profissionalId?S.porId('profissionais',profissionalId):null;
+        const base=p?.horariosSemana?.length===7?p:S.obter('config');
+        if(!R.horarioDisponivel(base,data,hora,duracao))return false;
+        if(!p)return true;
+        const inicio=U.horaMinutos(hora),fim=inicio+Number(duracao||0);
+        return !(p.ausencias||[]).some(a=>{const di=a.dataInicio||a.data,df=a.dataFim||a.data||di;return di&&data>=di&&data<=df&&inicio<U.horaMinutos(a.fim||'23:59')&&U.horaMinutos(a.inicio||'00:00')<fim});
+    }
     function abrirForm(id, preencher = {}) {
         const antigo = id ? S.porId('servicos', id) : null;
         if (id && !antigo) {
@@ -36,8 +54,12 @@
         const status = preencher.status || antigo?.status || A.perfil.statusInicial;
         const opçõesClientes = [{ value: '', label: 'Selecione um cliente' }, ...clientes.map(c => ({ value: c.id, label: c.nome }))];
         const profissionais = S.lista('profissionais').filter(p => p.ativo || p.id === antigo?.profissionalId);
+        const profissionalSelecionado = preencher.profissionalId ?? antigo?.profissionalId ?? (!antigo && profissionais.length===1 ? profissionais[0].id : '');
+        const campoProfissional = profissionais.length===1 && !antigo
+          ? '<input type="hidden" name="profissionalId" value="'+U.escapar(profissionalSelecionado)+'"><p class="muted">Profissional: <strong>'+U.escapar(profissionais[0].nome)+'</strong></p>'
+          : (profissionais.length ? UI.campo('Profissional','profissionalId',profissionalSelecionado,{ options:[{value:'',label:'Não atribuído'},...profissionais.map(p=>({value:p.id,label:p.nome}))] }) : '');
         const recorrencia = preencher.recorrencia || antigo?.recorrencia || {ativa:false,intervalo:1,unidade:'meses'};
-        const campos = `<form id="form-servico" class="form-grid"><div class="form-grid">${UI.campo('Cliente', 'clienteId', preencher.clienteId || antigo?.clienteId || '', { required: true, options: opçõesClientes })}<button class="btn secundario compacto" type="button" data-novo-cliente aria-expanded="false" aria-controls="cliente-rapido">+ Criar cliente agora</button><div id="cliente-rapido" class="cliente-rapido" hidden>${UI.campo('Nome do novo cliente', 'novoClienteNome', '', { attrs: 'autocomplete="name"' })}${UI.campo('Telefone com DDD', 'novoClienteTelefone', '', { attrs: 'inputmode="tel" data-mask="telefone" autocomplete="tel"' })}<div class="actions"><button type="button" class="btn compacto" data-salvar-cliente>Adicionar cliente</button><button type="button" class="btn secundario compacto" data-cancelar-cliente>Cancelar</button></div></div></div>${profissionais.length ? UI.campo('Profissional','profissionalId',preencher.profissionalId ?? antigo?.profissionalId ?? '',{ options:[{value:'',label:'Não atribuído'},...profissionais.map(p=>({value:p.id,label:p.nome}))] }) : ''}${UI.campo('Título', 'titulo', titulo, { attrs: 'placeholder="Ex.: Atendimento ou instalação"' })}<div class="section-heading"><h3>Itens do catálogo</h3><button type="button" class="btn secundario compacto" data-add-item>+ Item</button></div><div id="itens-form" class="stack"></div><div id="itens-erro" class="field-error"></div>${UI.campo('Desconto (R$)', 'desconto', U.numerico(valor), { attrs: 'inputmode="decimal" data-mask="moeda"' })}<div class="detail-row"><strong>Total</strong><strong class="numero destaque" id="total-form">${U.dinheiro(0)}</strong></div><div class="form-grid duas">${UI.campo('Data', 'data', data, { type: 'date', required: true })}${UI.campo('Hora', 'hora', preencher.hora || antigo?.hora || '09:00', { type: 'time', required: true })}</div>${UI.campo('Duração (min)', 'duracaoMin', preencher.duracaoMin ?? antigo?.duracaoMin ?? 60, { type: 'number', attrs: 'min="0" step="5" inputmode="numeric"' })}${UI.campo('Endereço', 'endereco', preencher.endereco ?? antigo?.endereco ?? '')}${UI.campo('Observações', 'observacoes', preencher.observacoes ?? antigo?.observacoes ?? '', { type: 'textarea' })}<div class="recorrencia-form"><label class="check-row"><input type="checkbox" name="recorrenciaAtiva" ${recorrencia.ativa ? 'checked' : ''}> Repetir este serviço</label><div class="form-grid duas">${UI.campo('Intervalo','recorrenciaIntervalo',recorrencia.intervalo || 1,{type:'number',attrs:'min="1" max="999" inputmode="numeric"'})}${UI.campo('Unidade','recorrenciaUnidade',recorrencia.unidade || 'meses',{options:[{value:'dias',label:'Dias'},{value:'semanas',label:'Semanas'},{value:'meses',label:'Meses'}]})}</div><div class="actions"><button type="button" class="btn secundario compacto" data-atalho="15:dias">15 dias</button><button type="button" class="btn secundario compacto" data-atalho="1:meses">1 mês</button><button type="button" class="btn secundario compacto" data-atalho="6:meses">6 meses</button></div></div>${UI.campo('Status', 'status', status, { options: STATUS.map(s => ({ value: s, label: A.perfil.status?.[s] || ({ orcamento: 'Orçamento', agendado: 'Agendado', andamento: 'Em andamento', concluido: 'Concluído', pago: 'Pago', cancelado: 'Cancelado' })[s] })) })}${A.perfil.mostraEtapas ? `<section><div class="section-heading"><h3>Etapas</h3><button type="button" class="btn secundario compacto" data-add-etapa>+ Etapa</button></div><div id="etapas-form" class="stack"></div></section>` : ''}<section><div class="section-heading"><h3>Parcelas</h3>${A.perfil.parcelasMultiplas ? '<button type="button" class="btn secundario compacto" data-add-parcela>+ Parcela</button>' : ''}</div><div id="parcelas-form" class="stack"></div><p id="parcelas-aviso" class="aviso" role="alert" hidden></p></section><p id="horario-aviso" class="aviso" role="status" hidden>Fora do horário configurado para este dia. Você pode salvar assim mesmo.</p><p id="conflito-aviso" class="aviso" role="status" hidden>Existe um compromisso nesse horário. Você pode salvar mesmo assim.</p></form><div class="sheet-save"><button type="submit" form="form-servico" class="btn">Salvar ${A.perfil.rotulo.toLowerCase()}</button></div>`;
+        const campos = `<form id="form-servico" class="form-grid"><div class="form-grid">${UI.campo('Cliente', 'clienteId', preencher.clienteId || antigo?.clienteId || '', { required: true, options: opçõesClientes })}<button class="btn secundario compacto" type="button" data-novo-cliente aria-expanded="false" aria-controls="cliente-rapido">+ Criar cliente agora</button><div id="cliente-rapido" class="cliente-rapido" hidden>${UI.campo('Nome do novo cliente', 'novoClienteNome', '', { attrs: 'autocomplete="name"' })}${UI.campo('Telefone com DDD', 'novoClienteTelefone', '', { attrs: 'inputmode="tel" data-mask="telefone" autocomplete="tel"' })}<div class="actions"><button type="button" class="btn compacto" data-salvar-cliente>Adicionar cliente</button><button type="button" class="btn secundario compacto" data-cancelar-cliente>Cancelar</button></div></div></div>${campoProfissional}${UI.campo('Título', 'titulo', titulo, { attrs: 'placeholder="Ex.: Atendimento ou instalação"' })}<div class="section-heading"><h3>Itens do catálogo</h3><button type="button" class="btn secundario compacto" data-add-item>+ Item</button></div><div id="itens-form" class="stack"></div><div id="itens-erro" class="field-error"></div>${UI.campo('Desconto (R$)', 'desconto', U.numerico(valor), { attrs: 'inputmode="decimal" data-mask="moeda"' })}<div class="detail-row"><strong>Total</strong><strong class="numero destaque" id="total-form">${U.dinheiro(0)}</strong></div><div class="form-grid duas">${UI.campo('Data', 'data', data, { type: 'date', required: true })}${UI.campo('Hora', 'hora', preencher.hora || antigo?.hora || '09:00', { type: 'time', required: true })}</div>${UI.campo('Duração (min)', 'duracaoMin', preencher.duracaoMin ?? antigo?.duracaoMin ?? 60, { type: 'number', attrs: 'min="0" step="5" inputmode="numeric"' })}${UI.campo('Endereço', 'endereco', preencher.endereco ?? antigo?.endereco ?? '')}${UI.campo('Observações', 'observacoes', preencher.observacoes ?? antigo?.observacoes ?? '', { type: 'textarea' })}<div class="recorrencia-form"><label class="check-row"><input type="checkbox" name="recorrenciaAtiva" ${recorrencia.ativa ? 'checked' : ''}> Repetir este serviço</label><div class="form-grid duas">${UI.campo('Intervalo','recorrenciaIntervalo',recorrencia.intervalo || 1,{type:'number',attrs:'min="1" max="999" inputmode="numeric"'})}${UI.campo('Unidade','recorrenciaUnidade',recorrencia.unidade || 'meses',{options:[{value:'dias',label:'Dias'},{value:'semanas',label:'Semanas'},{value:'meses',label:'Meses'}]})}</div><div class="actions"><button type="button" class="btn secundario compacto" data-atalho="15:dias">15 dias</button><button type="button" class="btn secundario compacto" data-atalho="1:meses">1 mês</button><button type="button" class="btn secundario compacto" data-atalho="6:meses">6 meses</button></div></div>${UI.campo('Status', 'status', status, { options: STATUS.map(s => ({ value: s, label: A.perfil.status?.[s] || ({ orcamento: 'Orçamento', agendado: 'Agendado', andamento: 'Em andamento', concluido: 'Concluído', pago: 'Pago', cancelado: 'Cancelado' })[s] })) })}${A.perfil.mostraEtapas ? `<section><div class="section-heading"><h3>Etapas</h3><button type="button" class="btn secundario compacto" data-add-etapa>+ Etapa</button></div><div id="etapas-form" class="stack"></div></section>` : ''}<section><div class="section-heading"><h3>Parcelas</h3>${A.perfil.parcelasMultiplas ? '<button type="button" class="btn secundario compacto" data-add-parcela>+ Parcela</button>' : ''}</div><div id="parcelas-form" class="stack"></div><p id="parcelas-aviso" class="aviso" role="alert" hidden></p></section><p id="horario-aviso" class="aviso erro" role="alert" hidden>O profissional não está disponível nesse horário.</p><p id="conflito-aviso" class="aviso erro" role="alert" hidden>Este profissional já possui um atendimento incompatível nesse horário.</p></form><div class="sheet-save"><button type="submit" form="form-servico" class="btn">Salvar ${A.perfil.rotulo.toLowerCase()}</button></div>`;
         UI.modal((antigo ? 'Editar ' : 'Novo ') + A.perfil.rotulo.toLowerCase(), campos, sheet => {
             const f = sheet.querySelector('#form-servico'), el = s => sheet.querySelector(s);
             const pegarItens = () => itens.filter(i => i.catalogoId).map(({ catalogoId, nome, qtd, precoUnit }) => ({ catalogoId, nome, qtd: Number(qtd), precoUnit: Number(precoUnit) }));
@@ -48,7 +70,7 @@
             function desenharParcelas() { el('#parcelas-form').innerHTML = parcelas.map((p, i) => `<div class="parcela-row" data-parcela="${p.id}"><div class="field"><label for="pv-${p.id}">Parcela ${i + 1} (R$)</label><input id="pv-${p.id}" data-valor-parcela inputmode="decimal" data-mask="moeda" value="${U.numerico(p.valor)}" ${p.pago ? 'disabled' : ''}></div><div class="field"><label for="pd-${p.id}">Vencimento</label><input id="pd-${p.id}" type="date" data-vencimento value="${p.vencimento}" ${p.pago ? 'disabled' : ''}></div><button type="button" class="icon-button" data-remove-parcela aria-label="Remover parcela" ${p.pago || !A.perfil.parcelasMultiplas ? 'disabled' : ''}>${UI.icon('trash')}</button></div>${p.pago ? `<p class="muted">Paga em ${U.exibirData(p.pagoEm)} · ${U.escapar(p.formaPagamento || '')}</p>` : ''}`).join(''); UI.mascara(el('#parcelas-form')); }
             function sincronizar() { const t = total(); if (!A.perfil.parcelasMultiplas && parcelas.length === 1 && !parcelas[0].pago)
                 parcelas[0].valor = t; if (A.perfil.parcelasMultiplas && parcelas.length === 1 && !parcelas[0].pago)
-                parcelas[0].valor = t; el('#total-form').textContent = U.dinheiro(t); const diferenca = Math.abs(U.centavos(U.somaParcelas(parcelas)) - U.centavos(t)); el('#parcelas-aviso').hidden = diferenca === 0; el('#parcelas-aviso').textContent = `A soma das parcelas (${U.dinheiro(U.somaParcelas(parcelas))}) deve ser igual ao total (${U.dinheiro(t)}).`; el('#horario-aviso').hidden = R.horarioDisponivel(S.obter('config'),f.elements.data.value,f.elements.hora.value,f.elements.duracaoMin.value); el('#conflito-aviso').hidden = !conflito({ data: f.elements.data.value, hora: f.elements.hora.value, status: f.elements.status.value, duracaoMin: f.elements.duracaoMin.value }, id); return diferenca === 0; }
+                parcelas[0].valor = t; el('#total-form').textContent = U.dinheiro(t); const diferenca = Math.abs(U.centavos(U.somaParcelas(parcelas)) - U.centavos(t)); el('#parcelas-aviso').hidden = diferenca === 0; el('#parcelas-aviso').textContent = `A soma das parcelas (${U.dinheiro(U.somaParcelas(parcelas))}) deve ser igual ao total (${U.dinheiro(t)}).`; const pid=f.elements.profissionalId?.value||null; el('#horario-aviso').hidden = horarioProfissionalDisponivel(pid,f.elements.data.value,f.elements.hora.value,f.elements.duracaoMin.value); el('#conflito-aviso').hidden = !conflito({ data:f.elements.data.value,hora:f.elements.hora.value,status:f.elements.status.value,duracaoMin:f.elements.duracaoMin.value,profissionalId:pid }, id); return diferenca === 0; }
             function atualizarTotais(redesenhar = true) { sincronizar(); if (redesenhar)
                 desenharParcelas(); }
             desenharItens();
@@ -184,11 +206,14 @@
             } if (parcelas.some(p => !p.vencimento || p.valor <= 0)) {
                 UI.toast('Informe valor e vencimento válidos em cada parcela.');
                 return;
-            } const d = new FormData(f), dados = { clienteId: d.get('clienteId'), titulo: (d.get('titulo') || '').trim() || novosItens[0].nome, itens: novosItens, desconto: U.lerMoeda(d.get('desconto')), total: total(), data: d.get('data'), hora: d.get('hora'), duracaoMin: Math.max(1, Number(d.get('duracaoMin')) || 60), endereco: d.get('endereco'), observacoes: d.get('observacoes'), status: d.get('status'), profissionalId:d.get('profissionalId') || null, recorrencia:{ ativa:d.has('recorrenciaAtiva'), intervalo:Math.max(1,parseInt(d.get('recorrenciaIntervalo'),10)||1), unidade:d.get('recorrenciaUnidade')||'meses' }, etapas: etapas.filter(e => e.titulo.trim()), parcelas }; if (dados.status === 'pago' && !parcelas.every(p => p.pago)) {
+            } const d = new FormData(f), dados = { clienteId: d.get('clienteId'), titulo: (d.get('titulo') || '').trim() || novosItens[0].nome, itens: novosItens, desconto: U.lerMoeda(d.get('desconto')), total: total(), data: d.get('data'), hora: d.get('hora'), duracaoMin: Math.max(1, Number(d.get('duracaoMin')) || 60), endereco: d.get('endereco'), observacoes: d.get('observacoes'), status: d.get('status'), profissionalId:d.get('profissionalId') || null, profissionalIds:d.get('profissionalId') ? [d.get('profissionalId')] : [], recorrencia:{ ativa:d.has('recorrenciaAtiva'), intervalo:Math.max(1,parseInt(d.get('recorrenciaIntervalo'),10)||1), unidade:d.get('recorrenciaUnidade')||'meses' }, etapas: etapas.filter(e => e.titulo.trim()), parcelas }; if (dados.status === 'pago' && !parcelas.every(p => p.pago)) {
                 UI.toast('Quite todas as parcelas antes de marcar como pago.');
                 return;
             } if (parcelas.every(p => p.pago))
-                dados.status = 'pago'; const temConflito = conflito(dados, id); const botaoSalvar = sheet.querySelector('.sheet-save [type="submit"]'); botaoSalvar.disabled = true; UI.tratarErro(() => { if (id) {
+                dados.status = 'pago';
+            if(!horarioProfissionalDisponivel(dados.profissionalId,dados.data,dados.hora,dados.duracaoMin)){UI.toast('O profissional não está disponível nesse horário.');return;}
+            const temConflito=conflito(dados,id);if(temConflito){UI.toast('Este profissional já possui um atendimento nesse horário.');return;}
+            const botaoSalvar = sheet.querySelector('.sheet-save [type="submit"]'); botaoSalvar.disabled = true; UI.tratarErro(() => { if (id) {
                 const historico = [...antigo.historico];
                 if (antigo.status !== dados.status)
                     historico.push({ status: dados.status, em: U.dataHora() });
@@ -198,7 +223,7 @@
                 const sid = U.id();
                 S.adicionar('servicos', { id: sid, ...dados, historico: [{ status: dados.status, em: U.dataHora() }], criadoEm: U.dataHora() });
                 id = sid;
-            } UI.fechar(); A.app.ir('#/servicos/' + encodeURIComponent(id)); const gerado=S.consumirRecorrente(); if(gerado) UI.toastAcao('Próximo agendamento criado para '+U.exibirData(gerado.data).slice(0,5),'Ver',()=>A.app.ir('#/servicos/'+encodeURIComponent(gerado.id))); else UI.toast(temConflito ? 'Salvo. Atenção: há conflito de horário.' : 'Registro salvo com sucesso.'); }); if (f.isConnected) botaoSalvar.disabled = false; });
+            } UI.fechar(); A.app.ir('#/servicos/' + encodeURIComponent(id)); const gerado=S.consumirRecorrente(); if(gerado) UI.toastAcao('Próximo agendamento criado para '+U.exibirData(gerado.data).slice(0,5),'Ver',()=>A.app.ir('#/servicos/'+encodeURIComponent(gerado.id))); else UI.toast('Registro salvo com sucesso.'); }); if (f.isConnected) botaoSalvar.disabled = false; });
         });
     }
     function atualizarStatus(id, status) { const s = S.porId('servicos', id); if (!s || s.status === status)
@@ -206,25 +231,29 @@
         UI.toast('Existem parcelas em aberto.');
         return;
     } S.atualizar('servicos', id, { status, historico: [...s.historico, { status, em: U.dataHora() }] }); A.app.refresh(); const gerado=S.consumirRecorrente(); if(gerado) UI.toastAcao('Próximo agendamento criado para '+U.exibirData(gerado.data).slice(0,5),'Ver',()=>A.app.ir('#/servicos/'+encodeURIComponent(gerado.id))); else UI.toast('Status atualizado.'); }
-    function acaoPrincipal(id) { const s = S.porId('servicos', id); if (!s)
-        return; if (A.perfil.acaoPrincipal === 'receber') {
-        const pendentes = s.parcelas.filter(p => !p.pago);
-        if (!pendentes.length) {
-            UI.toast('Todas as parcelas já estão pagas.');
-            return;
+    function acaoPrincipal(id) {
+        const s=S.porId('servicos',id);if(!s)return;
+        if(!podeEditarAtendimento()&&A.permissoes.pode('atendimentos.atualizar_proprios')){
+            const ordem=['orcamento','agendado','andamento','concluido'],i=ordem.indexOf(s.status);
+            if(i<0||i===ordem.length-1){UI.toast('Atendimento já concluído.');return;}
+            UI.tratarErro(()=>atualizarStatus(id,ordem[i+1]));return;
         }
-        abrirPagamento(id, pendentes[0].id, true);
-        return;
-    } const ordem = ['orcamento', 'agendado', 'andamento', 'concluido']; const i = ordem.indexOf(s.status); if (i < 0 || i === ordem.length - 1) {
-        UI.toast('Próxima etapa: registre o pagamento das parcelas.');
-        return;
-    } UI.tratarErro(() => atualizarStatus(id, ordem[i + 1])); }
+        if(A.perfil.acaoPrincipal==='receber'){
+            if(!podeReceber()){UI.toast('Seu perfil não possui permissão para receber pagamentos.');return;}
+            const pendentes=s.parcelas.filter(p=>!p.pago);
+            if(!pendentes.length){UI.toast('Todas as parcelas já estão pagas.');return;}
+            abrirPagamento(id,pendentes[0].id,true);return;
+        }
+        const ordem=['orcamento','agendado','andamento','concluido'],i=ordem.indexOf(s.status);
+        if(i<0||i===ordem.length-1){UI.toast('Próxima etapa: registre o pagamento das parcelas.');return;}
+        UI.tratarErro(()=>atualizarStatus(id,ordem[i+1]));
+    }
     function abrirPagamento(id, parcelaId, receberTudo = false) {
         const s = S.porId('servicos', id), p = s?.parcelas.find(x => x.id === parcelaId);
         if (!p || p.pago) return;
         const pendentes = s.parcelas.filter(x => !x.pago);
         UI.modal('Registrar recebimento', `<p class="muted" style="margin-bottom:12px">${receberTudo ? 'Receber todas as parcelas em aberto' : 'Parcela selecionada'} · ${U.dinheiro(receberTudo ? U.somarValores(pendentes.map(x => x.valor)) : p.valor)}</p><form id="form-pagamento" class="form-grid">${UI.campo('Forma de pagamento', 'formaPagamento', 'pix', { options: opcoesPagamento() })}${UI.campo('Data do recebimento', 'data', U.hoje(), { type: 'date', required: true })}<button class="btn" type="submit">Confirmar pagamento</button></form>`, sheet => {
-            sheet.querySelector('form').onsubmit = e => {
+            sheet.querySelector('form').onsubmit = async e => {
                 e.preventDefault(); const form = e.currentTarget;
                 if (!UI.validar(form)) return;
                 const botao = form.querySelector('[type="submit"]'); botao.disabled = true;
@@ -232,6 +261,25 @@
                     const atual = S.porId('servicos', id);
                     const ids = receberTudo ? atual.parcelas.filter(x => !x.pago).map(x => x.id) : [parcelaId];
                     const d = new FormData(form);
+                    if(podeReceber()&&!A.permissoes.pode('financeiro.editar')){
+                        // A recepção não manipula lançamentos financeiros locais.
+                        // O servidor valida a parcela e grava serviço + entrada em uma transação.
+                        if(navigator.onLine===false)throw Error('Conecte-se à internet para registrar o recebimento com segurança.');
+                        if(S.pendentes()){
+                            await S.sincronizar();
+                            if(S.pendentes())throw Error('Existem alterações aguardando sincronização. Resolva-as antes do recebimento.');
+                        }
+                        const resposta=await A.auth.client.rpc('registrar_recebimento_atendimento',{
+                            p_conta:A.auth.conta.id,p_servico_id:id,p_parcelas:ids,
+                            p_data:d.get('data'),p_forma:d.get('formaPagamento'),p_receber_tudo:receberTudo
+                        });
+                        if(resposta.error)throw resposta.error;
+                        if(!Number(resposta.data?.registrados)){UI.toast('Parcela já recebida.');UI.fechar();return}
+                        UI.fechar();
+                        await S.sincronizar();
+                        A.app.refresh();UI.toast('Recebimento confirmado e registrado com segurança.');
+                        return;
+                    }
                     if (!S.registrarPagamento(id, ids, d.get('data'), d.get('formaPagamento'), receberTudo)) { UI.toast('Parcela já recebida.'); UI.fechar(); return; }
                     UI.fechar(); A.app.refresh(); const gerado=S.consumirRecorrente(); if(gerado)UI.toastAcao('Próximo agendamento criado para '+U.exibirData(gerado.data).slice(0,5),'Ver',()=>A.app.ir('#/servicos/'+encodeURIComponent(gerado.id))); else UI.toast('Recebimento registrado no Financeiro.');
                 } catch (erro) { botao.disabled = false; UI.toast(erro.message); }
@@ -243,8 +291,33 @@
             if (S.estornarPagamento(id, parcelaId)) { A.app.refresh(); UI.toast('Pagamento estornado.'); }
         }), 'Desmarcar');
     }
-    function detalheHTML(id) { const s = S.porId('servicos', id); if (!s)
-        return UI.vazio('Não encontrado', 'Este registro não existe ou foi excluído.') + '<a href="#/servicos" class="btn secundario">Voltar para serviços</a>'; const c = cliente(s.clienteId); return `<div class="page-heading"><div><a href="#/servicos" class="text-button">← Voltar</a><h1 style="margin-top:8px">${U.escapar(s.titulo)}</h1><p class="muted">${U.escapar(c?.nome || 'Cliente')} · ${U.exibirData(s.data)} às ${U.escapar(s.hora)}</p></div>${UI.chip(s.status)}</div>${s.recorrencia?.ativa ? '<p class="badge-sutil">↻ Recorrente</p>' : ''}${UI.card(`<div class="detail-row"><span>Total</span><strong class="resumo-valor">${U.dinheiro(s.total)}</strong></div><div class="detail-row"><span>Desconto</span><span>${U.dinheiro(s.desconto)}</span></div><div class="detail-row"><span>Endereço</span><span>${U.escapar(s.endereco || '—')}</span></div>${s.observacoes ? `<p style="margin-top:12px">${U.escapar(s.observacoes)}</p>` : ''}<div class="actions"><button class="btn secundario compacto" data-editar>Editar</button><button class="btn perigo compacto" data-excluir>Excluir</button>${s.recorrencia?.ativa ? '<button class="btn secundario compacto" data-parar>Parar de repetir</button>' : ''}${s.status !== 'pago' && s.status !== 'cancelado' ? `<button class="btn compacto" data-principal>${A.perfil.botaoCard}</button>` : ''}</div>`)}<section class="section"><h2 style="margin-bottom:12px">Itens</h2>${UI.card(s.itens.map(i => `<div class="detail-row"><span>${U.escapar(i.nome)} × ${Number(i.qtd)}</span><strong class="numero">${U.dinheiro(i.qtd * i.precoUnit)}</strong></div>`).join(''))}</section>${A.perfil.mostraEtapas ? `<section class="section"><h2 style="margin-bottom:12px">Etapas</h2>${UI.card(s.etapas.length ? s.etapas.map(e => `<label class="check-row"><input type="checkbox" data-check="${e.id}" ${e.concluida ? 'checked' : ''}>${U.escapar(e.titulo)}</label>`).join('') : '<p class="muted">Nenhuma etapa cadastrada.</p>')}</section>` : ''}<section class="section"><h2 style="margin-bottom:12px">Parcelas</h2><div class="stack">${s.parcelas.map(p => UI.card(`<div class="list-card"><div class="grow"><strong class="numero">${U.dinheiro(p.valor)}</strong><p class="item-meta">Vencimento: ${U.exibirData(p.vencimento)}${p.pago ? ' · Pago ' + U.exibirData(p.pagoEm) : ''}</p></div>${p.pago ? '<span class="chip pago">Pago</span>' : p.vencimento < U.hoje() ? '<span class="chip andamento">Vencida</span>' : ''}</div><button class="btn ${p.pago ? 'secundario' : ''} compacto" style="margin-top:12px;width:100%" data-${p.pago ? 'estornar' : 'pagar'}="${p.id}">${p.pago ? 'Desmarcar pagamento' : 'Marcar como paga'}</button>`)).join('')}</div></section><section class="section"><h2 style="margin-bottom:12px">Histórico de status</h2>${UI.card(`<ol class="timeline">${[...s.historico].reverse().map(h => `<li><strong>${UI.chip(h.status)}</strong><small>${U.dataHoraVisivel(h.em)}</small></li>`).join('')}</ol>`)}</section><section class="section"><div class="actions">${s.status==='agendado' && s.data>=U.hoje() ? `<button class="btn secundario" data-lembrete>${UI.icon('sino',true)} Enviar lembrete</button>` : ''}${s.lembreteEnviadoEm ? '<span class="badge-sutil">🔔 Lembrete enviado</span>':''}<button class="btn secundario" data-whatsapp>Enviar por WhatsApp</button><button class="btn secundario" data-print>Gerar PDF</button>${s.parcelas.some(p=>p.pago) ? '<button class="btn secundario" data-recibo>Recibo</button><button class="btn secundario" data-recibo-whats>Enviar recibo no WhatsApp</button>' : ''}</div></section>`; }
+    function detalheHTML(id) {
+        const s=S.porId('servicos',id);if(!s)return UI.vazio('Não encontrado','Este registro não existe ou foi excluído.')+'<a href="#/servicos" class="btn secundario">Voltar para serviços</a>';
+        const c=cliente(s.clienteId),valores=podeValores(),editar=podeEditarAtendimento(),receber=podeReceber(),status=podeAtualizarStatus();
+        const resumo=UI.card(
+            (valores?'<div class="detail-row"><span>Total</span><strong class="resumo-valor">'+U.dinheiro(s.total)+'</strong></div><div class="detail-row"><span>Desconto</span><span>'+U.dinheiro(s.desconto)+'</span></div>':'')+
+            '<div class="detail-row"><span>Endereço</span><span>'+U.escapar(s.endereco||'—')+'</span></div>'+
+            (s.observacoes?'<p style="margin-top:12px">'+U.escapar(s.observacoes)+'</p>':'')+
+            '<div class="actions">'+
+              (editar?'<button class="btn secundario compacto" data-editar>Editar</button><button class="btn perigo compacto" data-excluir>Excluir</button>':'')+
+              (editar&&s.recorrencia?.ativa?'<button class="btn secundario compacto" data-parar>Parar de repetir</button>':'')+
+              (status&&s.status!=='pago'&&s.status!=='cancelado'?'<button class="btn compacto" data-principal>'+rotuloAcao()+'</button>':'')+
+            '</div>'
+        );
+        const itens=UI.card((s.itens||[]).map(i=>'<div class="detail-row"><span>'+U.escapar(i.nome)+' × '+Number(i.qtd)+'</span>'+(valores?'<strong class="numero">'+U.dinheiro(i.qtd*i.precoUnit)+'</strong>':'')+'</div>').join(''));
+        const etapas=A.perfil.mostraEtapas?'<section class="section"><h2 style="margin-bottom:12px">Etapas</h2>'+UI.card((s.etapas||[]).length?s.etapas.map(e=>'<label class="check-row"><input type="checkbox" data-check="'+U.escapar(e.id)+'" '+(e.concluida?'checked':'')+' '+(editar?'':'disabled')+'>'+U.escapar(e.titulo)+'</label>').join(''):'<p class="muted">Nenhuma etapa cadastrada.</p>')+'</section>':'';
+        const parcelas=valores?'<section class="section"><h2 style="margin-bottom:12px">Parcelas</h2><div class="stack">'+(s.parcelas||[]).map(p=>UI.card('<div class="list-card"><div class="grow"><strong class="numero">'+U.dinheiro(p.valor)+'</strong><p class="item-meta">Vencimento: '+U.exibirData(p.vencimento)+(p.pago?' · Pago '+U.exibirData(p.pagoEm):'')+'</p></div>'+(p.pago?'<span class="chip pago">Pago</span>':p.vencimento<U.hoje()?'<span class="chip andamento">Vencida</span>':'')+'</div>'+(receber&&(!p.pago||A.permissoes.pode('financeiro.editar'))?'<button class="btn '+(p.pago?'secundario':'')+' compacto" style="margin-top:12px;width:100%" data-'+(p.pago?'estornar':'pagar')+'="'+U.escapar(p.id)+'">'+(p.pago?'Desmarcar pagamento':'Marcar como paga')+'</button>':''))).join('')+'</div></section>':'';
+        const historico='<section class="section"><h2 style="margin-bottom:12px">Histórico de status</h2>'+UI.card('<ol class="timeline">'+[...(s.historico||[])].reverse().map(h=>'<li><strong>'+UI.chip(h.status)+'</strong><small>'+U.dataHoraVisivel(h.em)+'</small></li>').join('')+'</ol>')+'</section>';
+        const compartilhar='<section class="section"><div class="actions">'+
+          (s.status==='agendado'&&s.data>=U.hoje()?'<button class="btn secundario" data-lembrete>'+UI.icon('sino',true)+' Enviar lembrete</button>':'')+
+          (s.lembreteEnviadoEm?'<span class="badge-sutil">🔔 Lembrete enviado</span>':'')+
+          (valores?'<button class="btn secundario" data-whatsapp>Enviar por WhatsApp</button><button class="btn secundario" data-print>Gerar PDF</button>':'')+
+          (valores&&(s.parcelas||[]).some(p=>p.pago)?'<button class="btn secundario" data-recibo>Recibo</button><button class="btn secundario" data-recibo-whats>Enviar recibo no WhatsApp</button>':'')+
+        '</div></section>';
+        return '<div class="page-heading"><div><a href="#/servicos" class="text-button">← Voltar</a><h1 style="margin-top:8px">'+U.escapar(s.titulo)+'</h1><p class="muted">'+U.escapar(c?.nome||'Cliente')+' · '+U.exibirData(s.data)+' às '+U.escapar(s.hora)+'</p></div>'+UI.chip(s.status)+'</div>'+
+          (s.recorrencia?.ativa?'<p class="badge-sutil">↻ Recorrente</p>':'')+resumo+
+          '<section class="section"><h2 style="margin-bottom:12px">Itens</h2>'+itens+'</section>'+etapas+parcelas+historico+compartilhar;
+    }
     function bindDetalhe(root, id) { const s = S.porId('servicos', id); if (!s)
         return; root.addEventListener('click', e => { if (e.target.closest('[data-editar]'))
         abrirForm(id); if (e.target.closest('[data-excluir]'))

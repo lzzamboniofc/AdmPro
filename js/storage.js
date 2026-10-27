@@ -3,6 +3,8 @@
     'use strict';
     const U = A.utils, R = A.regras, PREFIXO = 'admpro_', COLECOES = ['config', 'clientes', 'catalogo', 'servicos', 'lancamentos', 'profissionais', 'despesasFixas', 'movimentacoesEstoque'];
     const copiar = v => JSON.parse(JSON.stringify(v));
+    let contaAtual = null, usuarioAtual = null, aplicandoRemoto = false;
+    const chaveCache = k => PREFIXO + (usuarioAtual ? usuarioAtual + '_' : '') + (contaAtual ? contaAtual + '_' : '') + k;
     const VERSAO_DADOS = 3;
     const problemas = new Set();
     const vazio = chave => chave === 'config' ? null : [];
@@ -12,9 +14,9 @@
     const chaveSessao = PREFIXO + 'sessao';
     const chaveTentativas = PREFIXO + 'tentativasPin';
     const chaveBloqueio = PREFIXO + 'bloqueioPin';
-    function sessaoLer(chave) { try { return sessionStorage.getItem(chave); } catch (_) { return null; } }
-    function sessaoGravar(chave, valor) { try { sessionStorage.setItem(chave, valor); } catch (_) { /* Navegador restrito: não mantém sessão. */ } }
-    function sessaoRemover(chave) { try { sessionStorage.removeItem(chave); } catch (_) { /* Sessão já indisponível. */ } }
+    function sessaoLer(chave) { try { return sessionStorage.getItem(chave + ':' + (contaAtual || 'sem-conta')); } catch (_) { return null; } }
+    function sessaoGravar(chave, valor) { try { sessionStorage.setItem(chave + ':' + (contaAtual || 'sem-conta'), valor); } catch (_) { /* Navegador restrito: não mantém sessão. */ } }
+    function sessaoRemover(chave) { try { sessionStorage.removeItem(chave + ':' + (contaAtual || 'sem-conta')); } catch (_) { /* Sessão já indisponível. */ } }
     function fnv(texto) {
         let a = 2166136261, b = 2166136261;
         for (let i = 0; i < texto.length; i++) {
@@ -52,8 +54,11 @@
     }
     async function definirPin(pin) {
         const config = obter('config');
-        if (!config) throw Error('Configure o negócio primeiro.');
-        gravar('config', { ...config, ...await hashPin(pin), versaoDados: VERSAO_DADOS });
+        if (!contaAtual || !usuarioAtual || !config) throw Error('Selecione uma empresa antes de criar o PIN.');
+        // O PIN pertence ao navegador e ao usuário; nunca altera a configuração
+        // empresarial nem exige config.editar para recepcionistas/profissionais.
+        const local={...config,...await hashPin(pin),versaoDados:VERSAO_DADOS};
+        localStorage.setItem(chaveCache('config'),JSON.stringify(local));
         abrirSessao();
     }
     function migrarDados() {
@@ -85,7 +90,8 @@
         if (!COLECOES.includes(chave))
             throw Error('Coleção desconhecida.');
         try {
-            const bruto = localStorage.getItem(PREFIXO + chave);
+            if (!contaAtual) return vazio(chave);
+            const bruto = localStorage.getItem(chaveCache(chave));
             if (!bruto) return vazio(chave);
             const dados = JSON.parse(bruto);
             if (chave === 'config' && (!dados || typeof dados !== 'object' || Array.isArray(dados))) throw Error('Configuração inválida');
@@ -101,8 +107,12 @@
     function gravar(chave, valor) {
         if (!COLECOES.includes(chave))
             throw Error('Coleção desconhecida.');
+        if (!contaAtual) throw Error('Faça login para salvar dados.');
+        validarEscrita(chave, valor); // preservar mensagem de limite/bloqueio
+        const anterior = obter(chave);
         try {
-            localStorage.setItem(PREFIXO + chave, JSON.stringify(valor));
+            localStorage.setItem(chaveCache(chave), JSON.stringify(valor));
+            registrarMudancas(chave, anterior, valor);
             return copiar(valor);
         }
         catch (e) {
@@ -168,7 +178,16 @@
         catch (_) { /* Erro original será exibido. */ } });
         throw e;
     } }
-    function limpar() { COLECOES.forEach(k => localStorage.removeItem(PREFIXO + k)); problemas.clear(); encerrarSessao(); sessaoRemover(chaveTentativas); sessaoRemover(chaveBloqueio); }
+    function limpar() {
+        if (!contaAtual) return;
+        COLECOES.forEach(k => {
+          const antes=obter(k);
+          registrarMudancas(k,antes,k==='config'?null:[]);
+          localStorage.removeItem(chaveCache(k));
+        });
+        problemas.clear();encerrarSessao();sessaoRemover(chaveTentativas);sessaoRemover(chaveBloqueio);
+        agendarSync();
+    }
     function exemplo(tipo) {
         const rapido = tipo === 'rapido';
         const nomes = rapido ? ['Ana Costa', 'Beatriz Santos', 'Carla Oliveira', 'Daniela Rocha', 'Elisa Martins'] : ['Carlos Almeida', 'Mariana Lopes', 'Rafael Souza', 'Fernanda Lima', 'Paulo Mendes'];
@@ -268,29 +287,31 @@
         gravar('servicos',lista('servicos').map(x => x.id === s.id ? { ...x, estoqueBaixado:false } : x));
     }
     function sincronizarServico(id) {
-        let s = porId('servicos', id);
-        if (!s) return;
-        const finalizado = ['concluido','pago'].includes(s.status);
-        if (!finalizado && s.estoqueBaixado) reverterEstoque(s);
-        s = porId('servicos',id);
-        if (finalizado && !s.estoqueBaixado) {
-            const baixas = R.itensEstoque(s, lista('catalogo'));
-            Object.entries(baixas).forEach(([itemId, qtd]) => movimentarEstoque(itemId,'saida',qtd,'Conclusão de '+s.titulo,s.id));
-            gravar('servicos',lista('servicos').map(x => x.id === id ? { ...x, estoqueBaixado:true } : x));
+        let s=porId('servicos',id);if(!s)return;
+        const podeEstoque=!A.permissoes?.pode||A.permissoes.pode('estoque.editar');
+        const podeAgenda=!A.permissoes?.pode||A.permissoes.pode('agenda.editar');
+        const finalizado=['concluido','pago'].includes(s.status);
+        if(podeEstoque){
+            if(!finalizado&&s.estoqueBaixado)reverterEstoque(s);
+            s=porId('servicos',id);
+            if(finalizado&&!s.estoqueBaixado){
+                const baixas=R.itensEstoque(s,lista('catalogo'));
+                Object.entries(baixas).forEach(([itemId,qtd])=>movimentarEstoque(itemId,'saida',qtd,'Conclusão de '+s.titulo,s.id));
+                gravar('servicos',lista('servicos').map(x=>x.id===id?{...x,estoqueBaixado:true}:x));
+            }
         }
-        s = porId('servicos',id);
-        if (finalizado && s.recorrencia?.ativa && !s.proximoGeradoId) {
-            const proxima = R.proximaData(s.data,s.recorrencia);
-            if (proxima) {
-                const novoId = U.id();
-                const novasParcelas = s.parcelas.map(p => ({ ...p, id:U.id(), pago:false, pagoEm:null, formaPagamento:null, lancamentoId:null, vencimento:R.proximaData(p.vencimento,s.recorrencia) || proxima }));
-                const filho = { ...copiar(s), id:novoId, status:'agendado', data:proxima, parcelas:novasParcelas,
-                    estoqueBaixado:false, proximoGeradoId:null, origemRecorrenciaId:s.id, lembreteEnviadoEm:null,
-                    historico:[{status:'agendado',em:U.dataHora()}], criadoEm:U.dataHora(), reciboNumero:null,
-                    etapas:s.etapas.map(e => ({ ...e, concluida:false })) };
-                // Registra vínculo antes de gerar o filho para impedir duplicação.
-                gravar('servicos',lista('servicos').map(x => x.id === id ? { ...x, proximoGeradoId:novoId } : x).concat(filho));
-                ultimoRecorrente = { id:novoId, data:proxima };
+        s=porId('servicos',id);
+        if(podeAgenda&&finalizado&&s.recorrencia?.ativa&&!s.proximoGeradoId){
+            const proxima=R.proximaData(s.data,s.recorrencia);
+            if(proxima){
+                const novoId=U.id();
+                const novasParcelas=s.parcelas.map(p=>({...p,id:U.id(),pago:false,pagoEm:null,formaPagamento:null,lancamentoId:null,vencimento:R.proximaData(p.vencimento,s.recorrencia)||proxima}));
+                const filho={...copiar(s),id:novoId,status:'agendado',data:proxima,parcelas:novasParcelas,
+                    estoqueBaixado:false,proximoGeradoId:null,origemRecorrenciaId:s.id,lembreteEnviadoEm:null,
+                    historico:[{status:'agendado',em:U.dataHora()}],criadoEm:U.dataHora(),reciboNumero:null,
+                    etapas:s.etapas.map(e=>({...e,concluida:false}))};
+                gravar('servicos',lista('servicos').map(x=>x.id===id?{...x,proximoGeradoId:novoId}:x).concat(filho));
+                ultimoRecorrente={id:novoId,data:proxima};
             }
         }
     }
@@ -319,5 +340,394 @@
         if (!s) throw Error('Serviço não encontrado.');
         atualizar('servicos',id,{ lembreteEnviadoEm:U.dataHora() });
     }
-    A.storage = { obter, gravar, lista, porId, adicionar, atualizar, excluir, removerServico, exportar, validarBackup, importar, limpar, exemplo, problemas, migrarDados, hashPin, verificarPin, definirPin, sessaoAtiva, abrirSessao, encerrarSessao, bloqueioRestante, registrarErroPin, registrarPagamento, estornarPagamento, movimentarEstoque, sincronizarServico, consumirRecorrente, gerarDespesasFixas, numeroRecibo, registrarLembrete };
+
+    // Sincronização por conta e fila persistente: dados continuam acessíveis sem rede.
+    const filaKey=()=>chaveCache('_fila');
+    const cursorKey=()=>chaveCache('_cursor');
+    const marcasKey=()=>chaveCache('_marcas');
+    const fechadosKey=()=>chaveCache('_avisosFechados');
+    const carregarJSON=(k,def)=>{try{return JSON.parse(localStorage.getItem(k))??def}catch(_){return def}};
+    const salvarJSON=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+    let sincronizando=false,agendado=0,relogio=0,ultimoAcesso=0,falhaSync='',avisosAtivos=[];
+    function fila(){return contaAtual?carregarJSON(filaKey(),[]):[]}
+    function pendentes(){return fila().length}
+    function estadoSync(){
+      if(navigator.onLine===false)return 'Offline'+(pendentes()?' · '+pendentes()+' pendente(s)':'');
+      if(sincronizando)return 'Sincronizando…';
+      if(pendentes())return pendentes()+' alteração(ões) pendente(s)';
+      return falhaSync?'Erro de sincronização':'Sincronizado';
+    }
+    function atualizarIndicador(){const n=document.getElementById('indicador-sync');if(n){n.textContent=estadoSync();n.title=falhaSync||n.textContent}}
+    function usarConta(id,userId,migrarCache=false){
+      if(!/^[a-f0-9-]{36}$/i.test(id||''))throw Error('Conta inválida');
+      if(userId&&!/^[a-f0-9-]{36}$/i.test(userId))throw Error('Usuário inválido');
+      if(userId&&migrarCache){
+        const antigo=PREFIXO+id+'_',novo=PREFIXO+userId+'_'+id+'_';
+        Object.keys(localStorage).filter(k=>k.startsWith(antigo)).forEach(k=>{const destino=novo+k.slice(antigo.length);if(localStorage.getItem(destino)==null)localStorage.setItem(destino,localStorage.getItem(k));localStorage.removeItem(k);});
+      }
+      const mudou=contaAtual!==id||usuarioAtual!==(userId||null);
+      contaAtual=id;usuarioAtual=userId||null;
+      if(mudou){falhaSync='';avisosAtivos=[];ultimoAcesso=0}
+      atualizarIndicador();
+    }
+    function limparCacheConta(userId){
+      if(userId){
+        const prefixo=PREFIXO+userId+'_';
+        Object.keys(localStorage).filter(k=>k.startsWith(prefixo)).forEach(k=>localStorage.removeItem(k));
+        localStorage.removeItem(PREFIXO+'usuario_'+userId);
+        localStorage.removeItem(PREFIXO+'vinculos_'+userId);
+        localStorage.removeItem(PREFIXO+'contaPreferida_'+userId);
+      }
+      encerrarSessao();contaAtual=null;usuarioAtual=null;falhaSync='';avisosAtivos=[];ultimoAcesso=0;
+      atualizarIndicador();
+    }
+    function limparCacheEmpresa(userId,contaId){
+      if(!userId||!contaId)return;
+      const prefixo=PREFIXO+userId+'_'+contaId+'_';
+      const chaves=Array.from({length:localStorage.length},(_,i)=>localStorage.key(i));
+      chaves.filter(k=>k?.startsWith(prefixo)).forEach(k=>localStorage.removeItem(k));
+      if(usuarioAtual===userId&&contaAtual===contaId){
+        encerrarSessao();contaAtual=null;usuarioAtual=null;
+        falhaSync='';avisosAtivos=[];ultimoAcesso=0;
+      }
+      atualizarIndicador();
+    }
+    function aplicarEscopo(perms={},membro={}){
+      if(!contaAtual||navigator.onLine===false)return;
+      const marca=chaveCache('_permissoesEfetivas');
+      const escopoAtual=JSON.stringify(perms),anterior=localStorage.getItem(marca);
+      if(anterior!==escopoAtual){
+        // Nunca reutiliza dados completos após a redução de acesso.
+        // PIN e nome local permanecem; os demais dados serão relidos já filtrados pela API.
+        for(const col of COLECOES.filter(x=>x!=='config'))
+          localStorage.removeItem(chaveCache(col));
+        const pend=fila().length;
+        salvarJSON(filaKey(),[]);
+        localStorage.removeItem(marcasKey());
+        localStorage.setItem(cursorKey(),'1970-01-01T00:00:00.000Z');
+        if(pend)A.ui?.toast('As permissões mudaram: alterações locais não sincronizadas foram descartadas.');
+        localStorage.setItem(marca,escopoAtual);
+      }
+      const remover=col=>localStorage.removeItem(chaveCache(col));
+      if(!perms['financeiro.ver']){remover('lancamentos');remover('despesasFixas')}
+      if(!perms['estoque.ver'])remover('movimentacoesEstoque');
+      if(!perms['catalogo.ver'])remover('catalogo');
+      if(!perms['equipe.ver'])remover('profissionais');
+      if(!perms['clientes.ver'])remover('clientes');
+      if(!perms['agenda.ver_todas']&&!perms['atendimentos.ver_todos'])remover('servicos');
+      if(!perms['config.editar']){
+        const cfg=obter('config');
+        if(cfg){
+          const seguro={...cfg};
+          delete seguro.metaMensal;delete seguro.reciboSequencia;
+          localStorage.setItem(chaveCache('config'),JSON.stringify(seguro));
+        }
+      }
+      const podeEscrever={
+        config:!!perms['config.editar'],
+        clientes:!!perms['clientes.editar'],
+        catalogo:!!perms['catalogo.editar'],
+        profissionais:!!perms['equipe.editar'],
+        lancamentos:!!perms['financeiro.editar'],
+        despesasFixas:!!perms['financeiro.editar'],
+        movimentacoesEstoque:!!perms['estoque.editar'],
+        servicos:!!perms['agenda.editar']
+      };
+      const atual=fila(),filtrada=atual.filter(x=>{
+        if(x.colecao==='servicos'&&!perms['agenda.editar'])
+          return !!perms['atendimentos.atualizar_proprios']&&x.operacao==='servico_operacional';
+        return podeEscrever[x.colecao]!==false;
+      });
+      if(filtrada.length!==atual.length)salvarJSON(filaKey(),filtrada);
+      atualizarIndicador();
+    }
+    function novaData(){relogio=Math.max(Date.now(),relogio+1);return new Date(relogio).toISOString()}
+    function seguro(colecao,item){
+      const v=copiar(item);
+      if(colecao==='config'){delete v.pinHash;delete v.pinMetodo}
+      return v;
+    }
+    function registrarMudancas(colecao,antes,depois){
+      if(!contaAtual||aplicandoRemoto)return;
+      const antiga=colecao==='config'?(antes?[{...seguro(colecao,antes),id:'principal'}]:[]):antes||[];
+      const nova=colecao==='config'?(depois?[{...seguro(colecao,depois),id:'principal'}]:[]):depois||[];
+      const prev=new Map(antiga.map(v=>[v.id,v]));
+      const atual=new Map(nova.map(v=>[v.id,v]));
+      const pend=new Map(fila().map(v=>[v.colecao+':'+v.id,v]));
+      const marcas=carregarJSON(marcasKey(),{});
+      const operacional=colecao==='servicos'&&!A.permissoes?.pode?.('agenda.editar')&&A.permissoes?.pode?.('atendimentos.atualizar_proprios');
+      if(operacional){
+        for(const [id,item] of atual){
+          const anteriorItem=prev.get(id);
+          if(!anteriorItem||JSON.stringify(anteriorItem)===JSON.stringify(item))continue;
+          const k=colecao+':'+id,anteriorFila=pend.get(k),statusSeq=Array.isArray(anteriorFila?.status_seq)?[...anteriorFila.status_seq]:[];
+          if(anteriorItem.status!==item.status&&statusSeq.at(-1)!==item.status)statusSeq.push(item.status);
+          const lembrete=!!anteriorFila?.lembrete||(anteriorItem.lembreteEnviadoEm!==item.lembreteEnviadoEm&&!!item.lembreteEnviadoEm);
+          pend.set(k,{operacao:'servico_operacional',colecao,id,status_seq:statusSeq,lembrete,
+            base_atualizado_em:anteriorFila?.base_atualizado_em??marcas[k]??null,
+            atualizado_em:novaData(),novoRegistro:false});
+        }
+        salvarJSON(filaKey(),[...pend.values()]);
+        atualizarIndicador();if(navigator.onLine!==false)agendarSync();
+        return;
+      }
+      for(const [id] of prev)if(!atual.has(id)){
+        const k=colecao+':'+id,anterior=pend.get(k);
+        if(anterior?.novoRegistro){pend.delete(k);continue}
+        pend.set(k,{colecao,id,excluido:true,dados:{},atualizado_em:novaData(),
+          base_atualizado_em:anterior?.base_atualizado_em??marcas[k]??null,novoRegistro:false});
+      }
+      for(const [id,item] of atual){
+        if(!prev.has(id)||JSON.stringify(prev.get(id))!==JSON.stringify(item)){
+          const k=colecao+':'+id,anterior=pend.get(k),novo=!prev.has(id)||anterior?.novoRegistro===true;
+          pend.set(k,{colecao,id,dados:seguro(colecao,item),excluido:false,atualizado_em:novaData(),
+            base_atualizado_em:novo?null:(anterior?.base_atualizado_em??marcas[k]??null),novoRegistro:novo});
+        }
+      }
+      salvarJSON(filaKey(),[...pend.values()]);
+      atualizarIndicador();if(navigator.onLine!==false)agendarSync();
+    }
+    function validarEscrita(colecao,novo){
+      if(!contaAtual||aplicandoRemoto)return;
+      if(A.auth?.conta?.status_assinatura==='bloqueada')throw Error('CONTA_BLOQUEADA: somente leitura. Faça backup ou regularize.');
+      const operacional=colecao==='servicos'&&!A.permissoes?.pode?.('agenda.editar')&&A.permissoes?.pode?.('atendimentos.atualizar_proprios');
+      if(operacional){
+        if(!Array.isArray(novo))throw Error('Alteração operacional inválida.');
+        const antes=lista('servicos'),mapAntes=new Map(antes.map(x=>[x.id,x])),mapNovo=new Map(novo.map(x=>[x.id,x]));
+        if(antes.length!==novo.length||antes.some(x=>!mapNovo.has(x.id)))throw Error('Seu perfil não pode criar ou excluir atendimentos.');
+        const prof=A.auth?.membro?.profissional_id;
+        for(const item of novo){
+          const old=mapAntes.get(item.id);if(!old)throw Error('Seu perfil não pode criar atendimentos.');
+          if(old.profissionalId!==prof||item.profissionalId!==prof)throw Error('Seu perfil só pode atualizar os próprios atendimentos.');
+          if(!['orcamento','agendado','andamento','concluido','pago','cancelado'].includes(item.status))throw Error('Status inválido.');
+          const limpa=x=>{const v=copiar(x);delete v.status;delete v.historico;delete v.lembreteEnviadoEm;return v};
+          if(JSON.stringify(limpa(old))!==JSON.stringify(limpa(item)))
+            throw Error('Seu perfil só pode atualizar o status e o lembrete dos próprios atendimentos.');
+        }
+      }
+      if(A.permissoes?.pode){
+        const exigida={
+          config:'config.editar',clientes:'clientes.editar',catalogo:'catalogo.editar',
+          profissionais:'equipe.editar',despesasFixas:'financeiro.editar',
+          movimentacoesEstoque:'estoque.editar'
+        }[colecao];
+        if(exigida&&!A.permissoes.pode(exigida))throw Error('Seu perfil não possui permissão para alterar estes dados.');
+        if(colecao==='lancamentos'&&!A.permissoes.pode('financeiro.editar'))
+          throw Error('Recebimentos devem ser feitos pelas parcelas; seu perfil não pode criar lançamentos livres.');
+        if(colecao==='servicos'&&!operacional&&!A.permissoes.pode('agenda.editar'))
+          throw Error('Seu perfil não possui permissão para alterar atendimentos.');
+      }
+      const plano=A.auth?.conta?.planos||{};
+      if(colecao==='clientes'&&Array.isArray(novo)&&plano.limite_clientes!=null&&novo.length>plano.limite_clientes){
+        A.ui?.modal('Limite de clientes','<p>Seu plano permite até '+plano.limite_clientes+' clientes.</p><a class="btn" href="#/assinatura">Assinar o Pro</a>');
+        throw Error('LIMITE_CLIENTES');
+      }
+      if(colecao==='servicos'&&Array.isArray(novo)&&plano.limite_servicos_mes!=null){
+        const antes=new Set(lista('servicos').map(v=>v.id));
+        const criados=novo.filter(v=>!antes.has(v.id)).length;
+        const pend=fila().filter(v=>v.colecao==='servicos'&&!v.excluido&&v.novoRegistro).length;
+        if(criados&&criados+pend+(A.auth?.servicosMes||0)>plano.limite_servicos_mes){
+          A.ui?.modal('Limite mensal','<p>Seu plano permite '+plano.limite_servicos_mes+' serviços/mês.</p><a class="btn" href="#/assinatura">Assinar o Pro</a>');
+          throw Error('LIMITE_SERVICOS_MES');
+        }
+      }
+    }
+    function agendarSync(){
+      if(agendado||!contaAtual||navigator.onLine===false)return;
+      agendado=setTimeout(()=>{agendado=0;sincronizar().catch(e=>{falhaSync=e.message;atualizarIndicador()})},80);
+    }
+    async function sincronizar(){
+      if(!contaAtual||!A.auth?.usuario||sincronizando||navigator.onLine===false)return;
+      const cid=contaAtual,client=A.auth.client;
+      sincronizando=true;falhaSync='';atualizarIndicador();
+      try{
+        for(const item of fila()){
+          if(cid!==contaAtual)return;
+          let data=null,error=null;
+          if(item.operacao==='servico_operacional'){
+            let base=item.base_atualizado_em||null,seq=[...(item.status_seq||[])],lembrar=!!item.lembrete;
+            if(!seq.length&&!lembrar){
+              salvarJSON(filaKey(),fila().filter(v=>!(v.colecao===item.colecao&&v.id===item.id&&v.atualizado_em===item.atualizado_em)));
+              continue;
+            }
+            while(seq.length||lembrar){
+              const status=seq.length?seq.shift():null,lembrarAgora=!seq.length&&lembrar;
+              const resp=await client.rpc('salvar_atendimento_operacional',{
+                p_conta:cid,p_id:item.id,p_status:status,p_lembrete:lembrarAgora,p_base_atualizado_em:base
+              });
+              if(resp.error){error=resp.error;break}
+              base=resp.data;data=resp.data;if(lembrarAgora)lembrar=false;
+              const q=fila(),idx=q.findIndex(v=>v.colecao===item.colecao&&v.id===item.id);
+              if(idx>=0){
+                let atualSeq=Array.isArray(q[idx].status_seq)?[...q[idx].status_seq]:[];
+                if(status!==null&&atualSeq[0]===status)atualSeq.shift();
+                q[idx]={...q[idx],base_atualizado_em:base,status_seq:atualSeq,lembrete:lembrarAgora?false:!!q[idx].lembrete};
+                salvarJSON(filaKey(),q);
+              }
+            }
+          }else{
+            const resp=await client.rpc('salvar_dado_otimista',{
+              p_conta:cid,p_colecao:item.colecao,p_id:item.id,p_dados:item.dados,
+              p_excluido:!!item.excluido,p_base_atualizado_em:item.base_atualizado_em||null,p_novo:!!item.novoRegistro
+            });
+            data=resp.data;error=resp.error;
+          }
+          if(error){
+            if(/STALE_WRITE/i.test(error.message)){
+              salvarJSON(filaKey(),fila().filter(v=>v.colecao!==item.colecao||v.id!==item.id));
+              localStorage.setItem(cursorKey(),'1970-01-01T00:00:00.000Z');
+              A.ui?.toast('Este registro foi alterado em outro acesso. A versão mais recente será carregada.');
+              continue;
+            }
+            falhaSync=error.message;
+            if(/LIMITE_/i.test(error.message))A.ui?.modal('Limite do plano','<p>'+U.escapar(error.message)+'</p><a class="btn" href="#/assinatura">Assinar o Pro</a>');
+            break;
+          }
+          const marcas=carregarJSON(marcasKey(),{});marcas[item.colecao+':'+item.id]=data;salvarJSON(marcasKey(),marcas);
+          const atualFila=fila();
+          if(item.operacao==='servico_operacional'){
+            salvarJSON(filaKey(),atualFila.filter(v=>{
+              if(v.colecao!==item.colecao||v.id!==item.id)return true;
+              return (v.status_seq||[]).length>0||!!v.lembrete;
+            }));
+          }else{
+            salvarJSON(filaKey(),atualFila.filter(v=>!(v.colecao===item.colecao&&v.id===item.id&&v.atualizado_em===item.atualizado_em)));
+          }
+        }
+        if(cid===contaAtual){await buscarMudancas();await A.auth.atualizarConta();}
+      }finally{sincronizando=false;atualizarIndicador();if(fila().length&&navigator.onLine!==false)agendarSync()}
+    }
+    async function buscarMudancas(){
+      if(!contaAtual)return;
+      const cid=contaAtual,cursor=localStorage.getItem(cursorKey())||'1970-01-01T00:00:00.000Z';
+      let offset=0,maior=cursor;
+      while(true){
+        const {data,error}=await A.auth.client.rpc('sincronizar_dados',{
+          p_conta:cid,p_cursor:cursor,p_offset:offset,p_limite:500
+        });
+        if(error)throw error;
+        if(cid!==contaAtual)return;
+        if(!data?.length)break;
+        integrarRemotos(data);
+        maior=data.reduce((acc,x)=>x.atualizado_em>acc?x.atualizado_em:acc,maior);
+        offset+=data.length;
+        if(data.length<500)break;
+      }
+      localStorage.setItem(cursorKey(),maior);
+      if(A.app?.refresh&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)){
+        if(obter('config'))A.app.aplicarConfig?.();
+        A.app.refresh();
+      }
+    }
+    function integrarRemotos(rows){
+      const pend=new Set(fila().map(v=>v.colecao+':'+v.id));
+      const marcas=carregarJSON(marcasKey(),{}),modificadas=new Map();
+      for(const row of rows){
+        const k=row.colecao+':'+row.id;
+        if(pend.has(k)||(marcas[k]&&marcas[k]>row.atualizado_em))continue;
+        if(!modificadas.has(row.colecao))modificadas.set(row.colecao,obter(row.colecao));
+        if(row.colecao==='config'){
+          const anterior=modificadas.get('config')||{};
+          modificadas.set('config',row.excluido?null:{...row.dados,...(anterior.pinHash?{pinHash:anterior.pinHash,pinMetodo:anterior.pinMetodo}:{})});
+        }else{
+          const arr=modificadas.get(row.colecao)||[];
+          const i=arr.findIndex(x=>x.id===row.id);
+          if(row.excluido){if(i>=0)arr.splice(i,1)}
+          else if(i>=0)arr[i]=row.dados;
+          else arr.push(row.dados);
+        }
+        marcas[k]=row.atualizado_em;
+      }
+      aplicandoRemoto=true;
+      try{
+        for(const [col,val] of modificadas){
+          if(val===null)localStorage.removeItem(chaveCache(col));
+          else localStorage.setItem(chaveCache(col),JSON.stringify(val));
+        }
+        salvarJSON(marcasKey(),marcas);
+      }finally{aplicandoRemoto=false}
+    }
+    async function registrarAcesso(){
+      if(!contaAtual||navigator.onLine===false)return;
+      const anterior=Math.max(ultimoAcesso,Number(localStorage.getItem(chaveCache('_ultimoAcesso'))||0));
+      if(Date.now()-anterior<1800000)return;
+      const {error}=await A.auth.client.rpc('registrar_acesso',{p_conta:contaAtual,p_versao_app:A.supabaseConfig.versaoApp||''});
+      if(error)throw error;
+      ultimoAcesso=Date.now();localStorage.setItem(chaveCache('_ultimoAcesso'),String(ultimoAcesso));
+    }
+    async function dadosAssinatura(){
+      if(!A.auth.conta)throw Error('Faça login.');
+      const c=A.auth.conta,sb=A.auth.client;
+      const rs=await Promise.all([
+        sb.from('planos').select('*').eq('id',c.plano_id).single(),
+        sb.from('pagamentos').select('*').eq('conta_id',c.id).order('criado_em',{ascending:false}),
+        sb.from('config_sistema').select('chave,valor'),
+        sb.from('planos').select('*').eq('nome','Pro').eq('ativo',true).maybeSingle()
+      ]);
+      for(const r of rs)if(r.error)throw r.error;
+      return {conta:c,plano:rs[0].data,pagamentos:rs[1].data||[],config:Object.fromEntries((rs[2].data||[]).map(v=>[v.chave,v.valor])),pro:rs[3].data};
+    }
+    async function carregarAvisos(){
+      if(!contaAtual||navigator.onLine===false)return avisosAtivos;
+      const id=contaAtual;
+      const {data,error}=await A.auth.client.from('avisos').select('id,titulo,mensagem,tipo').order('inicio',{ascending:false});
+      if(error)throw error;
+      if(id!==contaAtual)return [];
+      const fechados=new Set(carregarJSON(fechadosKey(),[]));
+      avisosAtivos=(data||[]).filter(v=>!fechados.has(v.id));
+      return avisosAtivos;
+    }
+    function avisosHTML(){return avisosAtivos.map(a=>'<aside class="admpro-aviso '+(a.tipo==='alerta'?'alerta':'')+'" role="status"><div><strong>'+U.escapar(a.titulo)+'</strong><p>'+U.escapar(a.mensagem)+'</p></div><button class="icon-button" data-fechar-aviso="'+U.escapar(a.id)+'" aria-label="Fechar aviso">×</button></aside>').join('')}
+    function bindAvisos(root){root.querySelectorAll('[data-fechar-aviso]').forEach(btn=>btn.onclick=()=>{salvarJSON(fechadosKey(),[...new Set([...carregarJSON(fechadosKey(),[]),btn.dataset.fecharAviso])]);avisosAtivos=avisosAtivos.filter(v=>v.id!==btn.dataset.fecharAviso);btn.closest('.admpro-aviso').remove()})}
+    async function enviarFeedback(tipo,mensagem){
+      if(!['duvida','problema','sugestao','pagamento'].includes(tipo))throw Error('Tipo inválido.');
+      if(!contaAtual)throw Error('Faça login.');
+      const {error}=await A.auth.client.from('feedbacks').insert({conta_id:contaAtual,tipo,mensagem});
+      if(error)throw error;
+    }
+    async function listarFeedbacks(){
+      if(!contaAtual)throw Error('Faça login.');
+      const {data,error}=await A.auth.client.from('feedbacks').select('*').eq('conta_id',contaAtual).order('criado_em',{ascending:false});
+      if(error)throw error;
+      return data||[];
+    }
+    async function atualizarDadosConta(obj){
+      const permitido=new Set(['nome_negocio','modelo_negocio','tipo_negocio','telefone','cidade','uf']);
+      const dados=Object.fromEntries(Object.entries(obj).filter(([k])=>permitido.has(k)));
+      if(!contaAtual||!Object.keys(dados).length)return;
+      if(A.permissoes?.pode&&!A.permissoes.pode('config.editar'))throw Error('Seu perfil não pode alterar os dados da empresa.');
+      const {error}=await A.auth.client.rpc('atualizar_dados_empresa',{
+        p_conta:contaAtual,
+        p_nome_negocio:dados.nome_negocio??null,
+        p_modelo_negocio:dados.modelo_negocio??null,
+        p_tipo_negocio:dados.tipo_negocio??null,
+        p_telefone:dados.telefone??null,
+        p_cidade:dados.cidade??null,
+        p_uf:dados.uf??null
+      });
+      if(error)throw error;
+      await A.auth.atualizarConta();
+    }
+    function possuiLegado(){return !!localStorage.getItem(PREFIXO+'config')}
+    function importarLegado(){
+      if(!contaAtual||obter('config'))throw Error('A conta já tem dados ou não está autenticada.');
+      const obj={};
+      for(const col of COLECOES){
+        const raw=localStorage.getItem(PREFIXO+col);
+        if(!raw)continue;
+        const v=JSON.parse(raw);
+        if(col==='config'?!v||typeof v!=='object':!Array.isArray(v))throw Error('Dados antigos inválidos.');
+        obj[col]=v;
+      }
+      for(const col of COLECOES)if(obj[col])gravar(col,obj[col]);
+    }
+    function guardarContaUsuario(userId,c){salvarJSON(PREFIXO+'usuario_'+userId,c)}
+    function contaCacheUsuario(userId){return carregarJSON(PREFIXO+'usuario_'+userId,null)}
+    function guardarVinculosUsuario(userId,v){salvarJSON(PREFIXO+'vinculos_'+userId,v)}
+    function vinculosCacheUsuario(userId){return carregarJSON(PREFIXO+'vinculos_'+userId,[])}
+    function definirContaPreferida(userId,contaId){localStorage.setItem(PREFIXO+'contaPreferida_'+userId,contaId)}
+    function contaPreferida(userId){return localStorage.getItem(PREFIXO+'contaPreferida_'+userId)||''}
+    A.storage = { obter, gravar, lista, porId, adicionar, atualizar, excluir, removerServico, exportar, validarBackup, importar, limpar, exemplo, problemas, migrarDados, hashPin, verificarPin, definirPin, sessaoAtiva, abrirSessao, encerrarSessao, bloqueioRestante, registrarErroPin, registrarPagamento, estornarPagamento, movimentarEstoque, sincronizarServico, consumirRecorrente, gerarDespesasFixas, numeroRecibo, registrarLembrete, usarConta, limparCacheConta, limparCacheEmpresa, pendentes, estadoSync, sincronizar, registrarAcesso, dadosAssinatura, carregarAvisos, avisosHTML, bindAvisos, enviarFeedback, listarFeedbacks, atualizarDadosConta, possuiLegado, importarLegado, guardarContaUsuario, contaCacheUsuario, guardarVinculosUsuario, vinculosCacheUsuario, definirContaPreferida, contaPreferida, aplicarEscopo };
 })(window.AdmPro = window.AdmPro || {});
+
+/* ADMPRO-SUPABASE-INTEGRADO */

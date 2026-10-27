@@ -22,10 +22,28 @@
     else
         location.hash = hash; }
     function rota() { const config = S.obter('config'); if (!config)
-        return { nome: 'onboarding' }; const partes = (location.hash.replace(/^#\/?/, '') || 'inicio').split('/'); const nome = partes[0] || 'inicio'; if (nome === 'gestao' && ['meta','estoque','profissionais','despesas'].includes(partes[1])) return {nome:'gestao',tipo:partes[1],id:partes[2] || null}; if (nome === 'servicos' && partes[1])
-        { try { return { nome: 'detalhe', id: decodeURIComponent(partes[1]) }; } catch (_) { return { nome: 'naoEncontrado' }; } } return { nome: menu.some(x => x[0] === nome) || ['config','catalogo'].includes(nome) ? nome : 'naoEncontrado' }; }
+        return { nome: 'onboarding' }; const partes = (location.hash.replace(/^#\/?/, '') || 'inicio').split('/'); const nome = partes[0] || 'inicio'; if(nome==='gestao'&&partes[1]==='profissionais')return {nome:'equipe'}; if (nome === 'gestao' && ['meta','estoque','despesas'].includes(partes[1])) return {nome:'gestao',tipo:partes[1],id:partes[2] || null}; if (nome === 'servicos' && partes[1])
+        { try { return { nome: 'detalhe', id: decodeURIComponent(partes[1]) }; } catch (_) { return { nome: 'naoEncontrado' }; } } return { nome: menu.some(x => x[0] === nome) || ['config','catalogo','assinatura','suporte','equipe','empresas'].includes(nome) ? nome : 'naoEncontrado' }; }
     function refresh() {
+        if(!A.auth.pronto || !A.auth.usuario || new URLSearchParams(location.search).get('modo')==='recuperar'){
+            const topo=document.getElementById('topbar'),nav=document.getElementById('navegacao'),fab=document.getElementById('fab');
+            topo.hidden=true;nav.hidden=true;fab.hidden=true;
+            const main=document.getElementById('conteudo');
+            main.innerHTML=!A.auth.pronto?'<p>Verificando sua sessão…</p>':A.views.autenticacao.render();
+            if(A.auth.pronto)A.views.autenticacao.bind(main);
+            return;
+        }
         const r = rota(), main = document.getElementById('conteudo'), topo = document.getElementById('topbar'), nav = document.getElementById('navegacao'), fab = document.getElementById('fab');
+        if(!A.auth.conta){
+            topo.hidden=true;nav.hidden=true;fab.hidden=true;
+            main.innerHTML=A.views.empresas.render();A.views.empresas.bind(main);return;
+        }
+        const rotaPermissao=r.nome==='detalhe'?'servicos':r.nome==='gestao'?'config':r.nome;
+        if(r.nome!=='naoEncontrado'&&!A.permissoes.rota(rotaPermissao)){
+            topo.hidden=false;nav.hidden=false;fab.hidden=true;
+            main.innerHTML=UI.vazio('Acesso restrito','Seu perfil não possui permissão para esta área.')+'<a class="btn secundario" href="#/inicio">Voltar ao Início</a>';
+            return;
+        }
         if (r.nome === 'onboarding' || (S.obter('config') && (!S.obter('config').pinHash || !S.sessaoAtiva()))) {
             const c = S.obter('config');
             const estado = !c ? 'onboarding' : !c.pinHash ? 'cadastro' : 'bloqueio';
@@ -41,10 +59,17 @@
         topo.hidden = false;
         nav.hidden = false;
         const c = S.obter('config');
-        topo.innerHTML = `<div class="topbar-identidade"><a class="admpro-marca" href="#/inicio" aria-label="AdmPro: ir ao início"><img id="admpro-header-logo" src="${A.marcaHeader}" alt="AdmPro" width="107" height="28"></a><div class="topbar-nome">${/^data:image\/(png|jpeg|webp);base64,/.test(c.logoBase64 || '') ? `<img class="logo" src="${U.escapar(c.logoBase64)}" alt="Logo do negócio">` : ''}<span title="${U.escapar(c.nomeNegocio)}">${U.escapar(c.nomeNegocio)}</span></div></div>${navigator.onLine===false ? '<span class="offline-badge" role="status">Offline</span>' : ''}<a href="#/config" class="topbar-config" aria-label="Abrir Configurações" title="Configurações">${UI.icon('config')}<span>Configurações</span></a><div class="user-menu"><button type="button" class="avatar-button" id="abrir-menu-user" aria-label="Menu do usuário" aria-expanded="false" aria-controls="menu-user">${U.escapar((c.nomeNegocio || 'A').trim().charAt(0).toUpperCase())}</button><div id="menu-user" class="user-dropdown" hidden><a href="#/config">${UI.icon('config',true)} Configurações</a><button type="button" class="danger" id="sair-menu">${UI.icon('logout',true)} Sair</button></div></div>`;
+        topo.innerHTML = `<div class="topbar-identidade"><a class="admpro-marca" href="#/inicio" aria-label="AdmPro: ir ao início"><img id="admpro-header-logo" src="${A.marcaHeader}" alt="AdmPro" width="107" height="28"></a><div class="topbar-nome">${/^data:image\/(png|jpeg|webp);base64,/.test(c.logoBase64 || '') ? `<img class="logo" src="${U.escapar(c.logoBase64)}" alt="Logo do negócio">` : ''}<span title="${U.escapar(c.nomeNegocio)}">${U.escapar(c.nomeNegocio)}</span></div></div><span id="indicador-sync" class="offline-badge" role="status" aria-live="polite">${U.escapar(S.estadoSync())}</span><a href="#/config" class="topbar-config" aria-label="Abrir Configurações" title="Configurações">${UI.icon('config')}<span>Configurações</span></a><div class="user-menu"><button type="button" class="avatar-button" id="abrir-menu-user" aria-label="Menu do usuário" aria-expanded="false" aria-controls="menu-user">${U.escapar((c.nomeNegocio || 'A').trim().charAt(0).toUpperCase())}</button><div id="menu-user" class="user-dropdown" hidden><a href="#/config">${UI.icon('config',true)} Configurações</a><button type="button" class="danger" id="sair-menu">${UI.icon('logout',true)} Sair</button></div></div>`;
+        if(!A.permissoes.rota('config')){
+            topo.querySelector('.topbar-config')?.remove();
+            topo.querySelector('#menu-user a[href="#/config"]')?.remove();
+        }
+        if((A.auth.contas?.length||0)>1 || (A.auth.convites?.length||0)){
+            topo.querySelector('#menu-user')?.insertAdjacentHTML('afterbegin','<a href="#/empresas">Trocar empresa</a>');
+        }
         topo.querySelector('#abrir-menu-user').onclick = () => { const el = topo.querySelector('#menu-user'); el.hidden = !el.hidden; topo.querySelector('#abrir-menu-user').setAttribute('aria-expanded', String(!el.hidden)); };
         topo.querySelector('#sair-menu').onclick = sair;
-        nav.innerHTML = menu.map(([id, label]) => `<a href="#/${id}" class="nav-item ${r.nome === id || (r.nome === 'detalhe' && id === 'servicos') ? 'ativo' : ''}" ${r.nome === id ? 'aria-current="page"' : ''}>${UI.icon(id)}<span>${label}</span></a>`).join('') + `<a href="#/config" class="nav-item config-sidebar ${r.nome==='config'||r.nome==='gestao'||r.nome==='catalogo'?'ativo':''}" ${r.nome==='config'?'aria-current="page"':''}>${UI.icon('config')}<span>Configurações</span></a><button type="button" class="sair-sidebar" id="sair-sidebar">${UI.icon('logout')} Sair</button>`;
+        nav.innerHTML = menu.filter(([id])=>A.permissoes.rota(id)).map(([id, label]) => `<a href="#/${id}" class="nav-item ${r.nome === id || (r.nome === 'detalhe' && id === 'servicos') ? 'ativo' : ''}" ${r.nome === id ? 'aria-current="page"' : ''}>${UI.icon(id)}<span>${label}</span></a>`).join('') + (A.permissoes.rota('config')?`<a href="#/config" class="nav-item config-sidebar ${r.nome==='config'||r.nome==='gestao'||r.nome==='catalogo'||r.nome==='equipe'?'ativo':''}" ${r.nome==='config'?'aria-current="page"':''}>${UI.icon('config')}<span>Configurações</span></a>`:'') + `<button type="button" class="sair-sidebar" id="sair-sidebar">${UI.icon('logout')} Sair</button>`;
         nav.querySelector('#sair-sidebar').onclick = sair;
         const view = r.nome === 'detalhe' ? A.views.servicos : A.views[r.nome];
         main.innerHTML = r.nome === 'naoEncontrado' ? UI.vazio('Não encontrado', 'Esta página não existe.') + '<a class="btn secundario" href="#/inicio">Voltar ao Início</a>' : r.nome === 'detalhe' ? view.detalheHTML(r.id) : r.nome === 'gestao' ? view.render(r.tipo,r.id) : view.render();
@@ -52,19 +77,33 @@
             view.bindDetalhe(main, r.id);
         else if (view)
             view.bind?.(main,r.tipo,r.id);
+        if(r.nome==='inicio'){
+          const c=A.auth.conta,estado=c?.status_assinatura;
+          const faltam=c?.trial_ate?Math.max(0,Math.ceil((new Date(c.trial_ate+'T12:00:00')-new Date())/86400000)):0;
+          const banner=estado==='trial'?'<aside class="admpro-banner">Faltam '+faltam+' dias de teste.</aside>':
+            estado==='atrasada'?'<aside class="admpro-banner alerta">Sua assinatura está atrasada. <a href="#/assinatura">Pagar</a></aside>':
+            estado==='bloqueada'?'<aside class="admpro-banner alerta">Somente leitura: assinatura bloqueada. <a href="#/assinatura">Pagar</a></aside>':'';
+          main.insertAdjacentHTML('afterbegin',S.avisosHTML()+banner);
+          S.bindAvisos(main);
+        }
+        if(A.auth.conta?.status_assinatura==='bloqueada'){
+          main.querySelectorAll('form input,form textarea,form select,button[type="submit"],#importar,#apagar').forEach(el=>el.disabled=true);
+        }
         const acoes = { inicio: () => A.views.servicos.abrirForm(), agenda: () => A.views.servicos.abrirForm(null, { data: U.hoje() }), clientes: () => A.views.clientes.abrirForm(), servicos: () => A.views.servicos.abrirForm(), financeiro: () => A.views.financeiro.abrirForm(), catalogo: () => A.views.catalogo.abrirForm() };
-        fab.hidden = !acoes[r.nome];
+        fab.hidden = !acoes[r.nome] || A.auth.conta?.status_assinatura === 'bloqueada' || !A.permissoes.podeCriar(r.nome);
         fab.innerHTML = UI.icon('plus');
         fab.setAttribute('aria-label', r.nome === 'financeiro' ? 'Novo lançamento' : r.nome === 'clientes' ? 'Novo cliente' : `Novo ${A.perfil.rotulo.toLowerCase()}`);
         fab.onclick = acoes[r.nome] || null;
     }
     function sair() {
-        UI.confirmar('Sair do AdmPro?', 'Deseja sair do AdmPro? Seus dados serão mantidos neste navegador.', () => {
-            S.encerrarSessao(); UI.fechar(); refresh(); UI.toast('Sessão encerrada.');
-        }, 'Sair');
+        const n=S.pendentes();
+        UI.confirmar('Sair do AdmPro?',n?'Você tem '+n+' alterações não sincronizadas. Ao sair, o cache local será apagado e estas alterações serão perdidas. Deseja continuar?':'A sessão será encerrada e o cache desta conta apagado.',async()=>{
+          try{await A.auth.sair();UI.fechar();refresh();UI.toast('Sessão encerrada.')}
+          catch(e){UI.toast(e.message)}
+        },'Sair');
     }
     function iniciar() { S.migrarDados(); if (S.obter('config')) {
-        S.gerarDespesasFixas();
+        if(A.auth.conta?.status_assinatura!=='bloqueada') S.gerarDespesasFixas();
         aplicarConfig();
         if (!location.hash || location.hash === '#/')
             location.hash = '#/inicio';
@@ -96,13 +135,43 @@
             reg.addEventListener('updatefound',()=>{const w=reg.installing;w?.addEventListener('statechange',()=>{if(w.state==='installed')verificar();});});
         }).catch(err => console.warn('PWA indisponível:',err.message));
     }
-    window.addEventListener('online',refresh);
+    async function retomarSessao(){
+      if(!A.auth.usuario||navigator.onLine===false)return;
+      try{
+        // Revisar os vínculos antes de qualquer envio pendente. A revogação
+        // deve apagar dados locais e impedir sincronização da empresa removida.
+        if(!await A.auth.revalidarAcesso())return;
+        await S.sincronizar();
+        S.registrarAcesso().catch(()=>{});
+      }catch(e){UI.toast('Não foi possível atualizar os acessos: '+e.message)}
+    }
+    window.addEventListener('online',()=>{retomarSessao()});
     window.addEventListener('offline',refresh);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden && A.auth.usuario)retomarSessao()});
     A.app = { iniciar, refresh, ir, aplicarConfig, sair, instalar, podeInstalar, instalada, atualizarPWA };
     window.addEventListener('hashchange', () => { UI.fechar(); refresh(); document.getElementById('conteudo').focus({ preventScroll: true }); window.scrollTo(0, 0); });
     window.addEventListener('keydown', e => { if (e.key === 'Escape')
         UI.fechar(); });
     temaSistema.addEventListener?.('change', () => { if (S.obter('config')?.tema === 'auto') aplicarConfig(); });
-    iniciar();
+    async function bootstrap(){
+      refresh();
+      const autenticado=await A.auth.boot();
+      if(new URLSearchParams(location.search).get('modo')==='recuperar')A.views.autenticacao.abrirRecuperacao();
+      if(autenticado){
+        try{await S.sincronizar();}catch(e){UI.toast(e.message);}
+        S.registrarAcesso().catch(()=>{});
+        S.carregarAvisos().then(()=>{if(location.hash==='#/inicio')refresh();}).catch(()=>{});
+      }
+      iniciar();
+      if(autenticado&&S.possuiLegado()&&!S.obter('config')){
+        UI.confirmar('Dados neste aparelho','Enviar os dados antigos para sua conta? Os originais continuarão neste aparelho.',()=>{
+          try{S.importarLegado();S.sincronizar().catch(()=>{});iniciar();}
+          catch(e){UI.toast(e.message)}
+        },'Enviar dados');
+      }
+    }
+    bootstrap();
     iniciarPWA();
 })(window.AdmPro = window.AdmPro || {});
+
+/* ADMPRO-SUPABASE-INTEGRADO */

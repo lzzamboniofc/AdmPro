@@ -1,0 +1,24 @@
+name: AdmPro staging JS checks
+on:
+  push:
+    branches: [feature/supabase-assinaturas-staging, feature/multiusuario-multiprofissional]
+  pull_request:
+    branches: [feature/supabase-assinaturas-staging]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check all browser JavaScript syntax
+        run: find js -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Check service worker syntax
+        run: node --check sw.js
+      - name: Validate pinned official vendor checksum
+        run: sha256sum -c js/vendor/supabase.js.sha256
+      - name: Regression tests for models, schedules and PWA cache
+        run: node --test tests/horarios.js tests/pwa.js
+      - name: Exercise current storage adapter
+        run: node tests/staging-storage.mjs
