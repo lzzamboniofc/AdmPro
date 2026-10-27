@@ -265,6 +265,10 @@
                         // A recepção não manipula lançamentos financeiros locais.
                         // O servidor valida a parcela e grava serviço + entrada em uma transação.
                         if(navigator.onLine===false)throw Error('Conecte-se à internet para registrar o recebimento com segurança.');
+                        if(S.pendentes()){
+                            await S.sincronizar();
+                            if(S.pendentes())throw Error('Existem alterações aguardando sincronização. Resolva-as antes do recebimento.');
+                        }
                         const resposta=await A.auth.client.rpc('registrar_recebimento_atendimento',{
                             p_conta:A.auth.conta.id,p_servico_id:id,p_parcelas:ids,
                             p_data:d.get('data'),p_forma:d.get('formaPagamento'),p_receber_tudo:receberTudo
