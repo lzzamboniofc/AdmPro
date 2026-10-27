@@ -100,7 +100,7 @@ create or replace function public.pode_ler_dado(p_conta uuid,p_colecao text,p_id
 returns boolean language plpgsql stable security definer set search_path='' as $$
 declare prof text;
 begin
-  if (select public.is_admin()) or not public.eh_membro(p_conta) then return false; end if;
+  if not public.eh_membro(p_conta) then return false; end if;
   if p_colecao='config' then return true; end if;
   if p_colecao='catalogo' then return public.tem_permissao(p_conta,'catalogo.ver'); end if;
   if p_colecao='profissionais' then return public.tem_permissao(p_conta,'equipe.ver') or public.meu_profissional(p_conta)=p_id; end if;
@@ -122,7 +122,7 @@ end $$;
 create or replace function public.pode_inserir_dado(p_conta uuid,p_colecao text,p_id text,p_dados jsonb)
 returns boolean language plpgsql stable security definer set search_path='' as $$
 begin
-  if (select public.is_admin()) or not public.eh_membro(p_conta) then return false; end if;
+  if not public.eh_membro(p_conta) then return false; end if;
   if p_colecao='config' then return public.tem_permissao(p_conta,'config.editar'); end if;
   if p_colecao='catalogo' then return public.tem_permissao(p_conta,'catalogo.editar'); end if;
   if p_colecao='profissionais' then return public.tem_permissao(p_conta,'equipe.editar'); end if;
@@ -138,7 +138,7 @@ create or replace function public.pode_atualizar_dado(p_conta uuid,p_colecao tex
 returns boolean language plpgsql stable security definer set search_path='' as $$
 declare prof text;
 begin
-  if (select public.is_admin()) or not public.eh_membro(p_conta) then return false; end if;
+  if not public.eh_membro(p_conta) then return false; end if;
   if p_colecao='servicos' then
     if public.tem_permissao(p_conta,'agenda.editar') then return true; end if;
     prof:=public.meu_profissional(p_conta);
