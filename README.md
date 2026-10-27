@@ -58,11 +58,11 @@ Os cálculos de metas, relatórios, recorrência, estoque, despesas fixas e comi
 
 ### PWA: instalar e testar offline
 
-O aplicativo continua abrindo por `file://` (sem service worker). Para instalar e testar o cache offline, é necessário servi-lo sob `http://localhost` ou HTTPS:
+O aplicativo continua abrindo por `file://` (sem service worker). O service worker tem fallback para `index.html`: a navegação pela raiz do projeto também funciona offline após a instalação, mesmo que a URL `/` nunca tenha sido acessada com o worker ativo. Para instalar e testar o cache offline, é necessário servi-lo sob `http://localhost` ou HTTPS:
 
 1. Abra esta pasta no VS Code e escolha **Live Server → Open with Live Server**, ou execute `npx serve .` no terminal (o segundo comando exige Node/npm e pode baixar o pacote `serve`, mas **não é uma dependência do AdmPro**).
 2. Acesse o endereço local informado pelo servidor (por exemplo, `http://localhost:5500/index.html`).
-3. Abra uma vez com conexão de rede disponível. Confirme em DevTools → Application → Service Workers que `sw.js` está ativo. Em Application → Cache Storage, confira `admpro-estaticos-v3-2`.
+3. Abra uma vez com conexão de rede disponível. Confirme em DevTools → Application → Service Workers que `sw.js` está ativo. Em Application → Cache Storage, confira `admpro-estaticos-v3-3`.
 4. Vá a Configurações → Instalação e escolha **Instalar app**, se disponível. No Safari do iPhone use **Compartilhar → Adicionar à Tela de Início**.
 5. Em DevTools → Network, ative **Offline** e recarregue: os arquivos estáticos devem permanecer disponíveis. Os dados continuam exclusivamente neste navegador.
 6. Ao atualizar o projeto, altere o valor de `CACHE` em `sw.js` para forçar o navegador a preparar a nova versão. A confirmação **Atualizar** ativa a versão que está aguardando.
@@ -88,9 +88,9 @@ Para investigar limitações específicas de navegadores móveis, valide também
 Para executar os testes de regras com Node.js 18+ (somente módulos nativos, sem `npm install` e sem etapa de build):
 
 ```bash
-node --test tests/regressao.js
+node --test tests/*.js
 ```
 
-Os testes verificam migração v2→v3, retenção de dados diante de JSON inválido, importação de backup, recorrência, controle de estoque, recebimentos, despesas fixas e valores monetários. `tests/` não faz parte dos scripts carregados pelo `index.html` e não é necessário para usar o aplicativo.
+Os testes verificam migração v2→v3, retenção de dados diante de JSON inválido, importação de backup, recorrência, controle de estoque, recebimentos, despesas fixas e valores monetários. `tests/pwa.js` simula instalação, leitura do cache em modo offline, fallback de navegação pela raiz, limpeza de cache antigo e atualização do service worker. Esses testes isolados não substituem a instalação real em Android, iOS ou Chrome local. `tests/` não faz parte dos scripts carregados pelo `index.html` e não é necessário para usar o aplicativo.
 
 Na migração, `storage.js` verifica se há coleções corrompidas antes de gravar e só marca a nova versão depois de converter os dados. Se encontrar um JSON inválido, a migração é adiada e o conteúdo original é preservado para possível recuperação por backup. Evite criar novos cadastros antes de restaurar o armazenamento corrompido.

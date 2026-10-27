@@ -1,5 +1,5 @@
 /* PWA: cache-first de arquivos estáticos do mesmo escopo. Sem acesso a dados privados. */
-const CACHE = 'admpro-estaticos-v3-2';
+const CACHE = 'admpro-estaticos-v3-3';
 const ARQUIVOS = [
   "./index.html",
   "./css/style.css",
@@ -62,9 +62,30 @@ self.addEventListener('message', evento => {
     if (evento.data?.tipo === 'SKIP_WAITING') self.skipWaiting();
 });
 self.addEventListener('fetch', evento => {
-    if (evento.request.method !== 'GET' || new URL(evento.request.url).origin !== self.location.origin) return;
-    evento.respondWith(caches.match(evento.request,{ignoreSearch:true}).then(cached => cached || fetch(evento.request).then(resposta => {
-        if (resposta.ok) { const copia = resposta.clone(); caches.open(CACHE).then(c => c.put(evento.request,copia)); }
-        return resposta;
-    })));
+    const requisicao = evento.request;
+    if (requisicao.method !== 'GET' || new URL(requisicao.url).origin !== self.location.origin) return;
+
+    evento.respondWith((async () => {
+        const cache = await caches.open(CACHE);
+        const guardado = await cache.match(requisicao, { ignoreSearch: true });
+        if (guardado) return guardado;
+
+        try {
+            const resposta = await fetch(requisicao);
+            if (resposta.ok) {
+                // Mantém a gravação viva mesmo após responder à requisição.
+                evento.waitUntil(cache.put(requisicao, resposta.clone()).catch(() => {}));
+            }
+            return resposta;
+        } catch (erro) {
+            // A raiz (/) pode não ter sido visitada após a instalação.
+            // Nesse caso, uma navegação offline usa o index já pré-armazenado.
+            if (requisicao.mode === 'navigate') {
+                const inicio = new URL('./index.html', self.registration.scope).href;
+                const alternativa = await cache.match(inicio);
+                if (alternativa) return alternativa;
+            }
+            throw erro;
+        }
+    })());
 });
