@@ -135,11 +135,19 @@
             reg.addEventListener('updatefound',()=>{const w=reg.installing;w?.addEventListener('statechange',()=>{if(w.state==='installed')verificar();});});
         }).catch(err => console.warn('PWA indisponível:',err.message));
     }
-    window.addEventListener('online',()=>{refresh();S.sincronizar().catch(e=>UI.toast(e.message));});
+    async function retomarSessao(){
+      if(!A.auth.usuario||navigator.onLine===false)return;
+      try{
+        // Revisar os vínculos antes de qualquer envio pendente. A revogação
+        // deve apagar dados locais e impedir sincronização da empresa removida.
+        if(!await A.auth.revalidarAcesso())return;
+        await S.sincronizar();
+        S.registrarAcesso().catch(()=>{});
+      }catch(e){UI.toast('Não foi possível atualizar os acessos: '+e.message)}
+    }
+    window.addEventListener('online',()=>{retomarSessao()});
     window.addEventListener('offline',refresh);
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden && A.auth.usuario){
-      S.registrarAcesso().catch(()=>{});S.sincronizar().catch(()=>{});
-    }});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden && A.auth.usuario)retomarSessao()});
     A.app = { iniciar, refresh, ir, aplicarConfig, sair, instalar, podeInstalar, instalada, atualizarPWA };
     window.addEventListener('hashchange', () => { UI.fechar(); refresh(); document.getElementById('conteudo').focus({ preventScroll: true }); window.scrollTo(0, 0); });
     window.addEventListener('keydown', e => { if (e.key === 'Escape')
