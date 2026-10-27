@@ -1346,3 +1346,5 @@ body.modal-aberto { position:static; top:auto!important; width:auto; overflow:hi
 .agenda-profissionais{display:grid;gap:12px}.agenda-coluna{min-width:0;border:1px solid var(--borda);border-radius:12px;padding:12px;background:var(--superficie)}
 .agenda-coluna>h3{display:flex;align-items:center;gap:8px;margin-bottom:10px}
 @media(min-width:1024px){.agenda-profissionais{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}}
+
+.foto-profissional{width:40px;height:40px;flex:none;object-fit:cover;border-radius:999px;border:2px solid var(--borda)}
