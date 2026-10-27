@@ -1,0 +1,25 @@
+name: Exportar Supabase UMD validado para Console
+on:
+  push:
+    branches: [feature/supabase-assinaturas-staging]
+    paths: [.github/workflows/export-console-vendor.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  vendor-zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Confirmar a integridade do UMD oficial
+        run: |
+          sha256sum -c js/vendor/supabase.js.sha256
+          node --check js/vendor/supabase.js
+      - name: Exportar artefato para entrega separada
+        uses: actions/upload-artifact@v4
+        with:
+          name: admpro-console-vendor-umd-2.117.3
+          path: |
+            js/vendor/supabase.js
+            js/vendor/supabase.js.sha256
+          if-no-files-found: error
