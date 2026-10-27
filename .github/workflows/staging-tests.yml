@@ -18,7 +18,7 @@ jobs:
         run: node --check sw.js
       - name: Validate pinned official vendor checksum
         run: sha256sum -c js/vendor/supabase.js.sha256
-      - name: Regression tests for models and schedules
-        run: node --test tests/horarios.js
+      - name: Regression tests for models, schedules and PWA cache
+        run: node --test tests/horarios.js tests/pwa.js
       - name: Exercise current storage adapter
         run: node tests/staging-storage.mjs
