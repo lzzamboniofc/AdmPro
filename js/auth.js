@@ -57,6 +57,7 @@ async function selecionarConta(id,{sincronizar=true}={}){
   if(navigator.onLine!==false){
     const rp=await client().rpc('permissoes_membro',{p_conta:conta.id});
     if(rp.error)throw rp.error;permissoes=rp.data||{};
+    v.permissoes_efetivas=permissoes;A.storage.guardarVinculosUsuario(usuario.id,vinculos);
     const status=await client().rpc('atualizar_minha_assinatura',{p_conta:conta.id});
     if(status.error)console.warn('Atualização do status:',status.error.message);
     await atualizarConta();
@@ -89,7 +90,7 @@ async function boot(){
           if(navigator.onLine!==false||(!local&&!cache.length))throw e;
           vinculos=cache;
           const v=cache.find(x=>x.conta_id===local?.id)||cache[0];
-          if(v){conta=v.conta||local;membro=v;A.storage.usarConta(conta.id,usuario.id,membro.papel==='dono');}
+          if(v){conta=v.conta||local;membro=v;permissoes=v.permissoes_efetivas||{};A.storage.usarConta(conta.id,usuario.id,membro.papel==='dono');}
         }
       }
       return !!usuario;
@@ -112,10 +113,11 @@ async function cadastrar(nome,email,senha){
   return !!r.session;
 }
 async function aceitarConvite(id){
-  ok(await client().rpc('aceitar_convite',{p_convite:id}));
+  const contaId=ok(await client().rpc('aceitar_convite',{p_convite:id}));
   await carregarVinculos();await carregarConvites();
-  const v=vinculos.find(x=>x.conta_id===convites.find(c=>c.id===id)?.conta_id);
+  const v=vinculos.find(x=>x.conta_id===contaId);
   if(v)await selecionarConta(v.conta_id);
+  return contaId;
 }
 async function trocarEmpresa(id){if(conta?.id===id)return conta;await A.storage.sincronizar().catch(()=>{});return selecionarConta(id);}
 async function recuperar(email){ok(await client().auth.resetPasswordForEmail(email,{redirectTo:new URL('index.html?modo=recuperar',location.href).href}));}
