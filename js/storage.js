@@ -284,29 +284,31 @@
         gravar('servicos',lista('servicos').map(x => x.id === s.id ? { ...x, estoqueBaixado:false } : x));
     }
     function sincronizarServico(id) {
-        let s = porId('servicos', id);
-        if (!s) return;
-        const finalizado = ['concluido','pago'].includes(s.status);
-        if (!finalizado && s.estoqueBaixado) reverterEstoque(s);
-        s = porId('servicos',id);
-        if (finalizado && !s.estoqueBaixado) {
-            const baixas = R.itensEstoque(s, lista('catalogo'));
-            Object.entries(baixas).forEach(([itemId, qtd]) => movimentarEstoque(itemId,'saida',qtd,'Conclusão de '+s.titulo,s.id));
-            gravar('servicos',lista('servicos').map(x => x.id === id ? { ...x, estoqueBaixado:true } : x));
+        let s=porId('servicos',id);if(!s)return;
+        const podeEstoque=!A.permissoes?.pode||A.permissoes.pode('estoque.editar');
+        const podeAgenda=!A.permissoes?.pode||A.permissoes.pode('agenda.editar');
+        const finalizado=['concluido','pago'].includes(s.status);
+        if(podeEstoque){
+            if(!finalizado&&s.estoqueBaixado)reverterEstoque(s);
+            s=porId('servicos',id);
+            if(finalizado&&!s.estoqueBaixado){
+                const baixas=R.itensEstoque(s,lista('catalogo'));
+                Object.entries(baixas).forEach(([itemId,qtd])=>movimentarEstoque(itemId,'saida',qtd,'Conclusão de '+s.titulo,s.id));
+                gravar('servicos',lista('servicos').map(x=>x.id===id?{...x,estoqueBaixado:true}:x));
+            }
         }
-        s = porId('servicos',id);
-        if (finalizado && s.recorrencia?.ativa && !s.proximoGeradoId) {
-            const proxima = R.proximaData(s.data,s.recorrencia);
-            if (proxima) {
-                const novoId = U.id();
-                const novasParcelas = s.parcelas.map(p => ({ ...p, id:U.id(), pago:false, pagoEm:null, formaPagamento:null, lancamentoId:null, vencimento:R.proximaData(p.vencimento,s.recorrencia) || proxima }));
-                const filho = { ...copiar(s), id:novoId, status:'agendado', data:proxima, parcelas:novasParcelas,
-                    estoqueBaixado:false, proximoGeradoId:null, origemRecorrenciaId:s.id, lembreteEnviadoEm:null,
-                    historico:[{status:'agendado',em:U.dataHora()}], criadoEm:U.dataHora(), reciboNumero:null,
-                    etapas:s.etapas.map(e => ({ ...e, concluida:false })) };
-                // Registra vínculo antes de gerar o filho para impedir duplicação.
-                gravar('servicos',lista('servicos').map(x => x.id === id ? { ...x, proximoGeradoId:novoId } : x).concat(filho));
-                ultimoRecorrente = { id:novoId, data:proxima };
+        s=porId('servicos',id);
+        if(podeAgenda&&finalizado&&s.recorrencia?.ativa&&!s.proximoGeradoId){
+            const proxima=R.proximaData(s.data,s.recorrencia);
+            if(proxima){
+                const novoId=U.id();
+                const novasParcelas=s.parcelas.map(p=>({...p,id:U.id(),pago:false,pagoEm:null,formaPagamento:null,lancamentoId:null,vencimento:R.proximaData(p.vencimento,s.recorrencia)||proxima}));
+                const filho={...copiar(s),id:novoId,status:'agendado',data:proxima,parcelas:novasParcelas,
+                    estoqueBaixado:false,proximoGeradoId:null,origemRecorrenciaId:s.id,lembreteEnviadoEm:null,
+                    historico:[{status:'agendado',em:U.dataHora()}],criadoEm:U.dataHora(),reciboNumero:null,
+                    etapas:s.etapas.map(e=>({...e,concluida:false}))};
+                gravar('servicos',lista('servicos').map(x=>x.id===id?{...x,proximoGeradoId:novoId}:x).concat(filho));
+                ultimoRecorrente={id:novoId,data:proxima};
             }
         }
     }
