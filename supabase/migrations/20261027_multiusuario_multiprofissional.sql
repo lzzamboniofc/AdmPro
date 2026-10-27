@@ -69,7 +69,7 @@ begin
     when 'dono' then '{"equipe.ver":true,"equipe.editar":true,"convites.gerenciar":true,"agenda.ver_todas":true,"agenda.editar":true,"agenda.propria":true,"atendimentos.ver_todos":true,"atendimentos.proprios":true,"atendimentos.atualizar_proprios":true,"clientes.ver":true,"clientes.editar":true,"clientes.vinculados":true,"catalogo.ver":true,"catalogo.editar":true,"financeiro.ver":true,"financeiro.editar":true,"financeiro.receber":true,"estoque.ver":true,"estoque.editar":true,"relatorios.operacionais":true,"config.editar":true,"auditoria.ver":true,"assinatura.gerenciar":true}'::jsonb
     when 'gerente' then '{"equipe.ver":true,"equipe.editar":true,"convites.gerenciar":true,"agenda.ver_todas":true,"agenda.editar":true,"atendimentos.ver_todos":true,"clientes.ver":true,"clientes.editar":true,"catalogo.ver":true,"catalogo.editar":true,"estoque.ver":true,"estoque.editar":true,"relatorios.operacionais":true,"config.editar":true,"auditoria.ver":true}'::jsonb
     when 'recepcionista' then '{"equipe.ver":true,"agenda.ver_todas":true,"agenda.editar":true,"atendimentos.ver_todos":true,"clientes.ver":true,"clientes.editar":true,"catalogo.ver":true,"financeiro.receber":true}'::jsonb
-    when 'profissional' then '{"agenda.propria":true,"atendimentos.proprios":true,"atendimentos.atualizar_proprios":true,"clientes.vinculados":true,"catalogo.ver":true}'::jsonb
+    when 'profissional' then '{"agenda.propria":true,"atendimentos.proprios":true,"atendimentos.atualizar_proprios":true,"clientes.vinculados":true}'::jsonb
     else '{}'::jsonb
   end;
   return base || coalesce(m.permissoes,'{}'::jsonb);
