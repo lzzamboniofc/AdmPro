@@ -3,8 +3,8 @@
     'use strict';
     const U = A.utils, R = A.regras, PREFIXO = 'admpro_', COLECOES = ['config', 'clientes', 'catalogo', 'servicos', 'lancamentos', 'profissionais', 'despesasFixas', 'movimentacoesEstoque'];
     const copiar = v => JSON.parse(JSON.stringify(v));
-    let contaAtual = null, aplicandoRemoto = false;
-    const chaveCache = k => PREFIXO + (contaAtual ? contaAtual + '_' : '') + k;
+    let contaAtual = null, usuarioAtual = null, aplicandoRemoto = false;
+    const chaveCache = k => PREFIXO + (usuarioAtual ? usuarioAtual + '_' : '') + (contaAtual ? contaAtual + '_' : '') + k;
     const VERSAO_DADOS = 3;
     const problemas = new Set();
     const vazio = chave => chave === 'config' ? null : [];
@@ -353,18 +353,27 @@
       return falhaSync?'Erro de sincronização':'Sincronizado';
     }
     function atualizarIndicador(){const n=document.getElementById('indicador-sync');if(n){n.textContent=estadoSync();n.title=falhaSync||n.textContent}}
-    function usarConta(id){
+    function usarConta(id,userId,migrarCache=false){
       if(!/^[a-f0-9-]{36}$/i.test(id||''))throw Error('Conta inválida');
-      if(contaAtual!==id){contaAtual=id;falhaSync='';avisosAtivos=[];ultimoAcesso=0}
+      if(userId&&!/^[a-f0-9-]{36}$/i.test(userId))throw Error('Usuário inválido');
+      if(userId&&migrarCache){
+        const antigo=PREFIXO+id+'_',novo=PREFIXO+userId+'_'+id+'_';
+        Object.keys(localStorage).filter(k=>k.startsWith(antigo)).forEach(k=>{const destino=novo+k.slice(antigo.length);if(localStorage.getItem(destino)==null)localStorage.setItem(destino,localStorage.getItem(k));localStorage.removeItem(k);});
+      }
+      const mudou=contaAtual!==id||usuarioAtual!==(userId||null);
+      contaAtual=id;usuarioAtual=userId||null;
+      if(mudou){falhaSync='';avisosAtivos=[];ultimoAcesso=0}
       atualizarIndicador();
     }
     function limparCacheConta(userId){
-      if(contaAtual){
-        const prefixo=PREFIXO+contaAtual+'_';
+      if(userId){
+        const prefixo=PREFIXO+userId+'_';
         Object.keys(localStorage).filter(k=>k.startsWith(prefixo)).forEach(k=>localStorage.removeItem(k));
+        localStorage.removeItem(PREFIXO+'usuario_'+userId);
+        localStorage.removeItem(PREFIXO+'vinculos_'+userId);
+        localStorage.removeItem(PREFIXO+'contaPreferida_'+userId);
       }
-      if(userId)localStorage.removeItem(PREFIXO+'usuario_'+userId);
-      encerrarSessao();contaAtual=null;falhaSync='';avisosAtivos=[];ultimoAcesso=0;
+      encerrarSessao();contaAtual=null;usuarioAtual=null;falhaSync='';avisosAtivos=[];ultimoAcesso=0;
       atualizarIndicador();
     }
     function novaData(){relogio=Math.max(Date.now(),relogio+1);return new Date(relogio).toISOString()}
@@ -487,7 +496,7 @@
       if(!contaAtual||navigator.onLine===false)return;
       const anterior=Math.max(ultimoAcesso,Number(localStorage.getItem(chaveCache('_ultimoAcesso'))||0));
       if(Date.now()-anterior<1800000)return;
-      const {error}=await A.auth.client.rpc('registrar_acesso',{p_versao_app:A.supabaseConfig.versaoApp||''});
+      const {error}=await A.auth.client.rpc('registrar_acesso',{p_conta:contaAtual,p_versao_app:A.supabaseConfig.versaoApp||''});
       if(error)throw error;
       ultimoAcesso=Date.now();localStorage.setItem(chaveCache('_ultimoAcesso'),String(ultimoAcesso));
     }
@@ -550,7 +559,11 @@
     }
     function guardarContaUsuario(userId,c){salvarJSON(PREFIXO+'usuario_'+userId,c)}
     function contaCacheUsuario(userId){return carregarJSON(PREFIXO+'usuario_'+userId,null)}
-    A.storage = { obter, gravar, lista, porId, adicionar, atualizar, excluir, removerServico, exportar, validarBackup, importar, limpar, exemplo, problemas, migrarDados, hashPin, verificarPin, definirPin, sessaoAtiva, abrirSessao, encerrarSessao, bloqueioRestante, registrarErroPin, registrarPagamento, estornarPagamento, movimentarEstoque, sincronizarServico, consumirRecorrente, gerarDespesasFixas, numeroRecibo, registrarLembrete, usarConta, limparCacheConta, pendentes, estadoSync, sincronizar, registrarAcesso, dadosAssinatura, carregarAvisos, avisosHTML, bindAvisos, enviarFeedback, listarFeedbacks, atualizarDadosConta, possuiLegado, importarLegado, guardarContaUsuario, contaCacheUsuario };
+    function guardarVinculosUsuario(userId,v){salvarJSON(PREFIXO+'vinculos_'+userId,v)}
+    function vinculosCacheUsuario(userId){return carregarJSON(PREFIXO+'vinculos_'+userId,[])}
+    function definirContaPreferida(userId,contaId){localStorage.setItem(PREFIXO+'contaPreferida_'+userId,contaId)}
+    function contaPreferida(userId){return localStorage.getItem(PREFIXO+'contaPreferida_'+userId)||''}
+    A.storage = { obter, gravar, lista, porId, adicionar, atualizar, excluir, removerServico, exportar, validarBackup, importar, limpar, exemplo, problemas, migrarDados, hashPin, verificarPin, definirPin, sessaoAtiva, abrirSessao, encerrarSessao, bloqueioRestante, registrarErroPin, registrarPagamento, estornarPagamento, movimentarEstoque, sincronizarServico, consumirRecorrente, gerarDespesasFixas, numeroRecibo, registrarLembrete, usarConta, limparCacheConta, pendentes, estadoSync, sincronizar, registrarAcesso, dadosAssinatura, carregarAvisos, avisosHTML, bindAvisos, enviarFeedback, listarFeedbacks, atualizarDadosConta, possuiLegado, importarLegado, guardarContaUsuario, contaCacheUsuario, guardarVinculosUsuario, vinculosCacheUsuario, definirContaPreferida, contaPreferida };
 })(window.AdmPro = window.AdmPro || {});
 
 /* ADMPRO-SUPABASE-INTEGRADO */
