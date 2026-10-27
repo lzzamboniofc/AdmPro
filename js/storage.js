@@ -414,11 +414,18 @@
       const prev=new Map(antiga.map(v=>[v.id,v]));
       const atual=new Map(nova.map(v=>[v.id,v]));
       const pend=new Map(fila().map(v=>[v.colecao+':'+v.id,v]));
-      for(const [id] of prev)if(!atual.has(id))pend.set(colecao+':'+id,{colecao,id,excluido:true,dados:{},atualizado_em:novaData()});
+      const marcas=carregarJSON(marcasKey(),{});
+      for(const [id] of prev)if(!atual.has(id)){
+        const k=colecao+':'+id,anterior=pend.get(k);
+        if(anterior?.novoRegistro){pend.delete(k);continue}
+        pend.set(k,{colecao,id,excluido:true,dados:{},atualizado_em:novaData(),
+          base_atualizado_em:anterior?.base_atualizado_em??marcas[k]??null,novoRegistro:false});
+      }
       for(const [id,item] of atual){
         if(!prev.has(id)||JSON.stringify(prev.get(id))!==JSON.stringify(item)){
-          const anterior=pend.get(colecao+':'+id);
-          pend.set(colecao+':'+id,{colecao,id,dados:seguro(colecao,item),excluido:false,atualizado_em:novaData(),novoRegistro:!prev.has(id)||anterior?.novoRegistro===true});
+          const k=colecao+':'+id,anterior=pend.get(k),novo=!prev.has(id)||anterior?.novoRegistro===true;
+          pend.set(k,{colecao,id,dados:seguro(colecao,item),excluido:false,atualizado_em:novaData(),
+            base_atualizado_em:novo?null:(anterior?.base_atualizado_em??marcas[k]??null),novoRegistro:novo});
         }
       }
       salvarJSON(filaKey(),[...pend.values()]);
@@ -453,14 +460,22 @@
       try{
         for(const item of fila()){
           if(cid!==contaAtual)return;
-          const payload={conta_id:cid,colecao:item.colecao,id:item.id,dados:item.dados,excluido:item.excluido,atualizado_em:item.atualizado_em};
-          const {error}=await client.from('dados').upsert(payload,{onConflict:'conta_id,colecao,id'});
+          const {data,error}=await client.rpc('salvar_dado_otimista',{
+            p_conta:cid,p_colecao:item.colecao,p_id:item.id,p_dados:item.dados,
+            p_excluido:!!item.excluido,p_base_atualizado_em:item.base_atualizado_em||null,p_novo:!!item.novoRegistro
+          });
           if(error){
-            if(/STALE_WRITE/i.test(error.message)){salvarJSON(filaKey(),fila().filter(v=>v.colecao!==item.colecao||v.id!==item.id));continue;}
+            if(/STALE_WRITE/i.test(error.message)){
+              salvarJSON(filaKey(),fila().filter(v=>v.colecao!==item.colecao||v.id!==item.id));
+              localStorage.setItem(cursorKey(),'1970-01-01T00:00:00.000Z');
+              A.ui?.toast('Este registro foi alterado em outro acesso. A versão mais recente será carregada.');
+              continue;
+            }
             falhaSync=error.message;
             if(/LIMITE_/i.test(error.message))A.ui?.modal('Limite do plano','<p>'+U.escapar(error.message)+'</p><a class="btn" href="#/assinatura">Assinar o Pro</a>');
             break;
           }
+          const marcas=carregarJSON(marcasKey(),{});marcas[item.colecao+':'+item.id]=data;salvarJSON(marcasKey(),marcas);
           salvarJSON(filaKey(),fila().filter(v=>!(v.colecao===item.colecao&&v.id===item.id&&v.atualizado_em===item.atualizado_em)));
         }
         if(cid===contaAtual){await buscarMudancas();await A.auth.atualizarConta();}
