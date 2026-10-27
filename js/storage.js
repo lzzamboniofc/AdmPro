@@ -434,7 +434,7 @@
           if(!anteriorItem||JSON.stringify(anteriorItem)===JSON.stringify(item))continue;
           const k=colecao+':'+id,anteriorFila=pend.get(k),statusSeq=Array.isArray(anteriorFila?.status_seq)?[...anteriorFila.status_seq]:[];
           if(anteriorItem.status!==item.status&&statusSeq.at(-1)!==item.status)statusSeq.push(item.status);
-          const lembrete=!!anteriorFila?.lembrete||(!anteriorItem.lembreteEnviadoEm&&!!item.lembreteEnviadoEm);
+          const lembrete=!!anteriorFila?.lembrete||(anteriorItem.lembreteEnviadoEm!==item.lembreteEnviadoEm&&!!item.lembreteEnviadoEm);
           pend.set(k,{operacao:'servico_operacional',colecao,id,status_seq:statusSeq,lembrete,
             base_atualizado_em:anteriorFila?.base_atualizado_em??marcas[k]??null,
             atualizado_em:novaData(),novoRegistro:false});
@@ -544,7 +544,15 @@
             break;
           }
           const marcas=carregarJSON(marcasKey(),{});marcas[item.colecao+':'+item.id]=data;salvarJSON(marcasKey(),marcas);
-          salvarJSON(filaKey(),fila().filter(v=>!(v.colecao===item.colecao&&v.id===item.id)));
+          const atualFila=fila();
+          if(item.operacao==='servico_operacional'){
+            salvarJSON(filaKey(),atualFila.filter(v=>{
+              if(v.colecao!==item.colecao||v.id!==item.id)return true;
+              return (v.status_seq||[]).length>0||!!v.lembrete;
+            }));
+          }else{
+            salvarJSON(filaKey(),atualFila.filter(v=>!(v.colecao===item.colecao&&v.id===item.id&&v.atualizado_em===item.atualizado_em)));
+          }
         }
         if(cid===contaAtual){await buscarMudancas();await A.auth.atualizarConta();}
       }finally{sincronizando=false;atualizarIndicador();if(fila().length&&navigator.onLine!==false)agendarSync()}
