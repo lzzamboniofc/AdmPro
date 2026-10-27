@@ -118,6 +118,7 @@ Principais arquivos:
 9. `20261027180800_professional_absence_ranges.sql`
 10. `20261027180900_professional_minimal_permissions.sql`
 11. `20261027181000_secure_company_profile.sql`
+12. `20261027181100_guard_permission_grants.sql`
 
 Algumas migrations posteriores também consolidam correções feitas durante a validação no staging. Elas devem permanecer na sequência para que ambientes que já receberam uma versão anterior cheguem ao mesmo estado final.
 
@@ -155,13 +156,30 @@ Todos os testes de banco abaixo foram executados dentro de transações com `ROL
 - escrita baseada em versão antiga recebe `STALE_WRITE`;
 - limites futuros de usuários/profissionais bloqueiam quando temporariamente configurados e não atuam quando `NULL`;
 - gerente consegue alterar dados operacionais da empresa pela RPC segura e não consegue alterar assinatura diretamente;
+- gerente não consegue conceder permissões que não possui, conceder privilégios exclusivos de assinatura, atribuir tipos de permissões inválidos nem alterar o próprio papel;
 - autenticação do AdmPro Console continua válida para admin;
 - `console_resumo`, métricas globais de equipe e métricas por conta continuam respondendo;
 - sintaxe dos módulos JavaScript modificados foi validada;
 - não foram encontrados usos nativos de `alert()`, `confirm()` ou `prompt()` nos módulos/testes JavaScript revisados.
 
+## Testes automáticos no GitHub Actions
+
+O workflow `.github/workflows/staging-tests.yml` verifica sintaxe de todos os módulos JavaScript, integridade do vendor Supabase, regras de horários/modelos e as operações reais do adaptador de armazenamento usando mocks das RPCs (incluindo `STALE_WRITE` e separação de cache por usuário + empresa).
+
+O workflow `.github/workflows/browser-multiusuario.yml` usa **Chromium real com Playwright**, sem acesso a dados de clientes ou usuários de staging/produção. Os testes de navegador cobrem:
+
+- proprietário entrando com PIN local e cadastrando profissional, ausência e convite;
+- agenda geral por profissional em desktop e ausência de overflow horizontal no mobile;
+- profissional criando PIN sem precisar de `config.editar`, consultando agenda própria e recebendo acesso restrito às áreas proibidas;
+- usuário convidado aceitando convite autenticado e recebendo o vínculo correto;
+- usuário com duas empresas trocando de contexto, criando PIN local na segunda empresa e consultando somente os dados da empresa ativa.
+
+No AdmPro Console, `.github/workflows/test-pr.yml` executa os testes estáticos, de templates e de integridade da biblioteca Supabase no PR sem disparar publicação em produção.
+
+**Limitação destes testes:** o navegador utiliza um Supabase simulado. Regras de RLS e RPCs foram testadas separadamente no banco de staging com transações revertidas, mas não houve uma sessão E2E completa contra o Auth real com e-mail de confirmação.
+
 ## Validação ainda recomendada antes de produção
 
-Os testes de banco e validações estáticas cobrem as regras críticas, mas a promoção para produção deve incluir uma rodada manual/E2E em navegador real para desktop e celular, especialmente: convite completo com confirmação de e-mail, troca entre duas empresas, responsividade da agenda em colunas, foto do profissional, fluxo de recebimento da recepção e comportamento offline após troca de permissões.
+Antes de promover, executar testes finais com contas reais de homologação e sem dados de assinantes reais, em desktop e celular: confirmação de e-mail do convite, vinculação real no Auth, troca entre empresas com permissões distintas, foto do profissional, recebimento pela recepção e modo offline após alterações de permissão. Os testes automáticos de navegador e de banco não substituem essa homologação.
 
 O advisor de segurança do staging também informa que a proteção contra senhas vazadas está desabilitada na configuração de Auth. Isso é configuração do projeto Supabase, não código desta evolução, e deve ser habilitado antes da promoção quando compatível com a política de autenticação adotada.
