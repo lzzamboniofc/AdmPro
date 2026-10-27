@@ -8,8 +8,13 @@
     const cliente = id => S.porId('clientes', id);
     const somenteAtivos = () => S.lista('catalogo').filter(c => c.ativo);
     const opcoesPagamento = () => MEIOS.map(([value, label]) => ({ value, label }));
+    const podeValores=()=>A.permissoes.pode('financeiro.ver')||A.permissoes.pode('financeiro.receber')||A.permissoes.pode('financeiro.editar');
+    const podeReceber=()=>A.permissoes.pode('financeiro.receber')||A.permissoes.pode('financeiro.editar');
+    const podeEditarAtendimento=()=>A.permissoes.pode('agenda.editar');
+    const podeAtualizarStatus=()=>podeEditarAtendimento()||A.permissoes.pode('atendimentos.atualizar_proprios');
+    const rotuloAcao=()=>!podeEditarAtendimento()&&A.permissoes.pode('atendimentos.atualizar_proprios')?'Atualizar status':A.perfil.botaoCard;
     function render() { return `<div class="page-heading"><div><h1>${A.perfil.plural}</h1><p class="muted">Orçamentos, compromissos e recebimentos.</p></div></div><div class="chips" aria-label="Filtrar por status">${['todos', ...STATUS].map(s => `<button type="button" class="chip filtro" data-filtro="${s}" aria-pressed="${filtro === s}">${s === 'todos' ? 'Todos' : UI.chip(s).replace(/<[^>]*>/g, '')}</button>`).join('')}</div><div class="field search-wrap"><label for="buscar-servicos">Buscar ${A.perfil.rotulo.toLowerCase()}</label><input id="buscar-servicos" placeholder="Título ou cliente" value="${U.escapar(busca)}"></div><div id="lista-servicos" class="stack">${listar()}</div>`; }
-    function listar() { const lista = S.lista('servicos').filter(s => (filtro === 'todos' || s.status === filtro) && (s.titulo + ' ' + (cliente(s.clienteId)?.nome || '')).toLocaleLowerCase('pt-BR').includes(busca.toLocaleLowerCase('pt-BR'))).sort((a, b) => b.data.localeCompare(a.data) || a.hora.localeCompare(b.hora)); return lista.length ? lista.map(s => UI.card(`<div class="list-card"><div class="grow"><h3>${U.escapar(s.titulo)}</h3><p class="item-meta">${U.escapar(cliente(s.clienteId)?.nome || 'Cliente')} · ${U.exibirData(s.data)} ${U.escapar(s.hora || '')}</p><p class="numero destaque" style="margin-top:8px">${U.dinheiro(s.total)}</p></div>${UI.chip(s.status)}</div>${s.recorrencia?.ativa ? '<span class="badge-sutil">↻ Recorrente</span>' : ''}<div class="actions"><button type="button" class="btn secundario compacto" data-abrir="${U.escapar(s.id)}">Detalhes</button>${s.status !== 'pago' && s.status !== 'cancelado' ? `<button type="button" class="btn compacto" data-avancar="${U.escapar(s.id)}">${A.perfil.botaoCard}</button>` : ''}</div>`)).join('') : (busca || filtro !== 'todos' ? UI.vazio('Nenhum resultado', 'Tente outro termo ou remova o filtro.', 'Limpar filtros', 'limparFiltros') : UI.vazio('Nenhum registro cadastrado', 'Cadastre um novo ' + A.perfil.rotulo.toLowerCase() + ' para começar.', 'Novo ' + A.perfil.rotulo.toLowerCase(), 'novoServico')); }
+    function listar() { const lista = S.lista('servicos').filter(s => (filtro === 'todos' || s.status === filtro) && (s.titulo + ' ' + (cliente(s.clienteId)?.nome || '')).toLocaleLowerCase('pt-BR').includes(busca.toLocaleLowerCase('pt-BR'))).sort((a, b) => b.data.localeCompare(a.data) || a.hora.localeCompare(b.hora)); return lista.length ? lista.map(s => UI.card(`<div class="list-card"><div class="grow"><h3>${U.escapar(s.titulo)}</h3><p class="item-meta">${U.escapar(cliente(s.clienteId)?.nome || 'Cliente')} · ${U.exibirData(s.data)} ${U.escapar(s.hora || '')}</p>${podeValores()?`<p class="numero destaque" style="margin-top:8px">${U.dinheiro(s.total)}</p>`:''}</div>${UI.chip(s.status)}</div>${s.recorrencia?.ativa ? '<span class="badge-sutil">↻ Recorrente</span>' : ''}<div class="actions"><button type="button" class="btn secundario compacto" data-abrir="${U.escapar(s.id)}">Detalhes</button>${s.status !== 'pago' && s.status !== 'cancelado' && podeAtualizarStatus() ? `<button type="button" class="btn compacto" data-avancar="${U.escapar(s.id)}">${rotuloAcao()}</button>` : ''}</div>`)).join('') : (busca || filtro !== 'todos' ? UI.vazio('Nenhum resultado', 'Tente outro termo ou remova o filtro.', 'Limpar filtros', 'limparFiltros') : UI.vazio('Nenhum registro cadastrado', 'Cadastre um novo ' + A.perfil.rotulo.toLowerCase() + ' para começar.', 'Novo ' + A.perfil.rotulo.toLowerCase(), 'novoServico')); }
     function bind(root) { root.querySelector('#buscar-servicos').oninput = e => { busca = e.target.value; root.querySelector('#lista-servicos').innerHTML = listar(); }; root.addEventListener('click', e => { const f = e.target.closest('[data-filtro]'), d = e.target.closest('[data-abrir]'), av = e.target.closest('[data-avancar]'); if (f) {
         filtro = f.dataset.filtro;
         A.app.refresh();
@@ -226,19 +231,23 @@
         UI.toast('Existem parcelas em aberto.');
         return;
     } S.atualizar('servicos', id, { status, historico: [...s.historico, { status, em: U.dataHora() }] }); A.app.refresh(); const gerado=S.consumirRecorrente(); if(gerado) UI.toastAcao('Próximo agendamento criado para '+U.exibirData(gerado.data).slice(0,5),'Ver',()=>A.app.ir('#/servicos/'+encodeURIComponent(gerado.id))); else UI.toast('Status atualizado.'); }
-    function acaoPrincipal(id) { const s = S.porId('servicos', id); if (!s)
-        return; if (A.perfil.acaoPrincipal === 'receber') {
-        const pendentes = s.parcelas.filter(p => !p.pago);
-        if (!pendentes.length) {
-            UI.toast('Todas as parcelas já estão pagas.');
-            return;
+    function acaoPrincipal(id) {
+        const s=S.porId('servicos',id);if(!s)return;
+        if(!podeEditarAtendimento()&&A.permissoes.pode('atendimentos.atualizar_proprios')){
+            const ordem=['orcamento','agendado','andamento','concluido'],i=ordem.indexOf(s.status);
+            if(i<0||i===ordem.length-1){UI.toast('Atendimento já concluído.');return;}
+            UI.tratarErro(()=>atualizarStatus(id,ordem[i+1]));return;
         }
-        abrirPagamento(id, pendentes[0].id, true);
-        return;
-    } const ordem = ['orcamento', 'agendado', 'andamento', 'concluido']; const i = ordem.indexOf(s.status); if (i < 0 || i === ordem.length - 1) {
-        UI.toast('Próxima etapa: registre o pagamento das parcelas.');
-        return;
-    } UI.tratarErro(() => atualizarStatus(id, ordem[i + 1])); }
+        if(A.perfil.acaoPrincipal==='receber'){
+            if(!podeReceber()){UI.toast('Seu perfil não possui permissão para receber pagamentos.');return;}
+            const pendentes=s.parcelas.filter(p=>!p.pago);
+            if(!pendentes.length){UI.toast('Todas as parcelas já estão pagas.');return;}
+            abrirPagamento(id,pendentes[0].id,true);return;
+        }
+        const ordem=['orcamento','agendado','andamento','concluido'],i=ordem.indexOf(s.status);
+        if(i<0||i===ordem.length-1){UI.toast('Próxima etapa: registre o pagamento das parcelas.');return;}
+        UI.tratarErro(()=>atualizarStatus(id,ordem[i+1]));
+    }
     function abrirPagamento(id, parcelaId, receberTudo = false) {
         const s = S.porId('servicos', id), p = s?.parcelas.find(x => x.id === parcelaId);
         if (!p || p.pago) return;
@@ -263,8 +272,33 @@
             if (S.estornarPagamento(id, parcelaId)) { A.app.refresh(); UI.toast('Pagamento estornado.'); }
         }), 'Desmarcar');
     }
-    function detalheHTML(id) { const s = S.porId('servicos', id); if (!s)
-        return UI.vazio('Não encontrado', 'Este registro não existe ou foi excluído.') + '<a href="#/servicos" class="btn secundario">Voltar para serviços</a>'; const c = cliente(s.clienteId); return `<div class="page-heading"><div><a href="#/servicos" class="text-button">← Voltar</a><h1 style="margin-top:8px">${U.escapar(s.titulo)}</h1><p class="muted">${U.escapar(c?.nome || 'Cliente')} · ${U.exibirData(s.data)} às ${U.escapar(s.hora)}</p></div>${UI.chip(s.status)}</div>${s.recorrencia?.ativa ? '<p class="badge-sutil">↻ Recorrente</p>' : ''}${UI.card(`<div class="detail-row"><span>Total</span><strong class="resumo-valor">${U.dinheiro(s.total)}</strong></div><div class="detail-row"><span>Desconto</span><span>${U.dinheiro(s.desconto)}</span></div><div class="detail-row"><span>Endereço</span><span>${U.escapar(s.endereco || '—')}</span></div>${s.observacoes ? `<p style="margin-top:12px">${U.escapar(s.observacoes)}</p>` : ''}<div class="actions"><button class="btn secundario compacto" data-editar>Editar</button><button class="btn perigo compacto" data-excluir>Excluir</button>${s.recorrencia?.ativa ? '<button class="btn secundario compacto" data-parar>Parar de repetir</button>' : ''}${s.status !== 'pago' && s.status !== 'cancelado' ? `<button class="btn compacto" data-principal>${A.perfil.botaoCard}</button>` : ''}</div>`)}<section class="section"><h2 style="margin-bottom:12px">Itens</h2>${UI.card(s.itens.map(i => `<div class="detail-row"><span>${U.escapar(i.nome)} × ${Number(i.qtd)}</span><strong class="numero">${U.dinheiro(i.qtd * i.precoUnit)}</strong></div>`).join(''))}</section>${A.perfil.mostraEtapas ? `<section class="section"><h2 style="margin-bottom:12px">Etapas</h2>${UI.card(s.etapas.length ? s.etapas.map(e => `<label class="check-row"><input type="checkbox" data-check="${e.id}" ${e.concluida ? 'checked' : ''}>${U.escapar(e.titulo)}</label>`).join('') : '<p class="muted">Nenhuma etapa cadastrada.</p>')}</section>` : ''}<section class="section"><h2 style="margin-bottom:12px">Parcelas</h2><div class="stack">${s.parcelas.map(p => UI.card(`<div class="list-card"><div class="grow"><strong class="numero">${U.dinheiro(p.valor)}</strong><p class="item-meta">Vencimento: ${U.exibirData(p.vencimento)}${p.pago ? ' · Pago ' + U.exibirData(p.pagoEm) : ''}</p></div>${p.pago ? '<span class="chip pago">Pago</span>' : p.vencimento < U.hoje() ? '<span class="chip andamento">Vencida</span>' : ''}</div><button class="btn ${p.pago ? 'secundario' : ''} compacto" style="margin-top:12px;width:100%" data-${p.pago ? 'estornar' : 'pagar'}="${p.id}">${p.pago ? 'Desmarcar pagamento' : 'Marcar como paga'}</button>`)).join('')}</div></section><section class="section"><h2 style="margin-bottom:12px">Histórico de status</h2>${UI.card(`<ol class="timeline">${[...s.historico].reverse().map(h => `<li><strong>${UI.chip(h.status)}</strong><small>${U.dataHoraVisivel(h.em)}</small></li>`).join('')}</ol>`)}</section><section class="section"><div class="actions">${s.status==='agendado' && s.data>=U.hoje() ? `<button class="btn secundario" data-lembrete>${UI.icon('sino',true)} Enviar lembrete</button>` : ''}${s.lembreteEnviadoEm ? '<span class="badge-sutil">🔔 Lembrete enviado</span>':''}<button class="btn secundario" data-whatsapp>Enviar por WhatsApp</button><button class="btn secundario" data-print>Gerar PDF</button>${s.parcelas.some(p=>p.pago) ? '<button class="btn secundario" data-recibo>Recibo</button><button class="btn secundario" data-recibo-whats>Enviar recibo no WhatsApp</button>' : ''}</div></section>`; }
+    function detalheHTML(id) {
+        const s=S.porId('servicos',id);if(!s)return UI.vazio('Não encontrado','Este registro não existe ou foi excluído.')+'<a href="#/servicos" class="btn secundario">Voltar para serviços</a>';
+        const c=cliente(s.clienteId),valores=podeValores(),editar=podeEditarAtendimento(),receber=podeReceber(),status=podeAtualizarStatus();
+        const resumo=UI.card(
+            (valores?'<div class="detail-row"><span>Total</span><strong class="resumo-valor">'+U.dinheiro(s.total)+'</strong></div><div class="detail-row"><span>Desconto</span><span>'+U.dinheiro(s.desconto)+'</span></div>':'')+
+            '<div class="detail-row"><span>Endereço</span><span>'+U.escapar(s.endereco||'—')+'</span></div>'+
+            (s.observacoes?'<p style="margin-top:12px">'+U.escapar(s.observacoes)+'</p>':'')+
+            '<div class="actions">'+
+              (editar?'<button class="btn secundario compacto" data-editar>Editar</button><button class="btn perigo compacto" data-excluir>Excluir</button>':'')+
+              (editar&&s.recorrencia?.ativa?'<button class="btn secundario compacto" data-parar>Parar de repetir</button>':'')+
+              (status&&s.status!=='pago'&&s.status!=='cancelado'?'<button class="btn compacto" data-principal>'+rotuloAcao()+'</button>':'')+
+            '</div>'
+        );
+        const itens=UI.card((s.itens||[]).map(i=>'<div class="detail-row"><span>'+U.escapar(i.nome)+' × '+Number(i.qtd)+'</span>'+(valores?'<strong class="numero">'+U.dinheiro(i.qtd*i.precoUnit)+'</strong>':'')+'</div>').join(''));
+        const etapas=A.perfil.mostraEtapas?'<section class="section"><h2 style="margin-bottom:12px">Etapas</h2>'+UI.card((s.etapas||[]).length?s.etapas.map(e=>'<label class="check-row"><input type="checkbox" data-check="'+U.escapar(e.id)+'" '+(e.concluida?'checked':'')+' '+(editar?'':'disabled')+'>'+U.escapar(e.titulo)+'</label>').join(''):'<p class="muted">Nenhuma etapa cadastrada.</p>')+'</section>':'';
+        const parcelas=valores?'<section class="section"><h2 style="margin-bottom:12px">Parcelas</h2><div class="stack">'+(s.parcelas||[]).map(p=>UI.card('<div class="list-card"><div class="grow"><strong class="numero">'+U.dinheiro(p.valor)+'</strong><p class="item-meta">Vencimento: '+U.exibirData(p.vencimento)+(p.pago?' · Pago '+U.exibirData(p.pagoEm):'')+'</p></div>'+(p.pago?'<span class="chip pago">Pago</span>':p.vencimento<U.hoje()?'<span class="chip andamento">Vencida</span>':'')+'</div>'+(receber?'<button class="btn '+(p.pago?'secundario':'')+' compacto" style="margin-top:12px;width:100%" data-'+(p.pago?'estornar':'pagar')+'="'+U.escapar(p.id)+'">'+(p.pago?'Desmarcar pagamento':'Marcar como paga')+'</button>':''))).join('')+'</div></section>':'';
+        const historico='<section class="section"><h2 style="margin-bottom:12px">Histórico de status</h2>'+UI.card('<ol class="timeline">'+[...(s.historico||[])].reverse().map(h=>'<li><strong>'+UI.chip(h.status)+'</strong><small>'+U.dataHoraVisivel(h.em)+'</small></li>').join('')+'</ol>')+'</section>';
+        const compartilhar='<section class="section"><div class="actions">'+
+          (s.status==='agendado'&&s.data>=U.hoje()?'<button class="btn secundario" data-lembrete>'+UI.icon('sino',true)+' Enviar lembrete</button>':'')+
+          (s.lembreteEnviadoEm?'<span class="badge-sutil">🔔 Lembrete enviado</span>':'')+
+          (valores?'<button class="btn secundario" data-whatsapp>Enviar por WhatsApp</button><button class="btn secundario" data-print>Gerar PDF</button>':'')+
+          (valores&&(s.parcelas||[]).some(p=>p.pago)?'<button class="btn secundario" data-recibo>Recibo</button><button class="btn secundario" data-recibo-whats>Enviar recibo no WhatsApp</button>':'')+
+        '</div></section>';
+        return '<div class="page-heading"><div><a href="#/servicos" class="text-button">← Voltar</a><h1 style="margin-top:8px">'+U.escapar(s.titulo)+'</h1><p class="muted">'+U.escapar(c?.nome||'Cliente')+' · '+U.exibirData(s.data)+' às '+U.escapar(s.hora)+'</p></div>'+UI.chip(s.status)+'</div>'+
+          (s.recorrencia?.ativa?'<p class="badge-sutil">↻ Recorrente</p>':'')+resumo+
+          '<section class="section"><h2 style="margin-bottom:12px">Itens</h2>'+itens+'</section>'+etapas+parcelas+historico+compartilhar;
+    }
     function bindDetalhe(root, id) { const s = S.porId('servicos', id); if (!s)
         return; root.addEventListener('click', e => { if (e.target.closest('[data-editar]'))
         abrirForm(id); if (e.target.closest('[data-excluir]'))
