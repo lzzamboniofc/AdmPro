@@ -253,7 +253,7 @@
         if (!p || p.pago) return;
         const pendentes = s.parcelas.filter(x => !x.pago);
         UI.modal('Registrar recebimento', `<p class="muted" style="margin-bottom:12px">${receberTudo ? 'Receber todas as parcelas em aberto' : 'Parcela selecionada'} · ${U.dinheiro(receberTudo ? U.somarValores(pendentes.map(x => x.valor)) : p.valor)}</p><form id="form-pagamento" class="form-grid">${UI.campo('Forma de pagamento', 'formaPagamento', 'pix', { options: opcoesPagamento() })}${UI.campo('Data do recebimento', 'data', U.hoje(), { type: 'date', required: true })}<button class="btn" type="submit">Confirmar pagamento</button></form>`, sheet => {
-            sheet.querySelector('form').onsubmit = e => {
+            sheet.querySelector('form').onsubmit = async e => {
                 e.preventDefault(); const form = e.currentTarget;
                 if (!UI.validar(form)) return;
                 const botao = form.querySelector('[type="submit"]'); botao.disabled = true;
@@ -261,6 +261,21 @@
                     const atual = S.porId('servicos', id);
                     const ids = receberTudo ? atual.parcelas.filter(x => !x.pago).map(x => x.id) : [parcelaId];
                     const d = new FormData(form);
+                    if(podeReceber()&&!A.permissoes.pode('financeiro.editar')){
+                        // A recepção não manipula lançamentos financeiros locais.
+                        // O servidor valida a parcela e grava serviço + entrada em uma transação.
+                        if(navigator.onLine===false)throw Error('Conecte-se à internet para registrar o recebimento com segurança.');
+                        const resposta=await A.auth.client.rpc('registrar_recebimento_atendimento',{
+                            p_conta:A.auth.conta.id,p_servico_id:id,p_parcelas:ids,
+                            p_data:d.get('data'),p_forma:d.get('formaPagamento'),p_receber_tudo:receberTudo
+                        });
+                        if(resposta.error)throw resposta.error;
+                        if(!Number(resposta.data?.registrados)){UI.toast('Parcela já recebida.');UI.fechar();return}
+                        UI.fechar();
+                        await S.sincronizar();
+                        A.app.refresh();UI.toast('Recebimento confirmado e registrado com segurança.');
+                        return;
+                    }
                     if (!S.registrarPagamento(id, ids, d.get('data'), d.get('formaPagamento'), receberTudo)) { UI.toast('Parcela já recebida.'); UI.fechar(); return; }
                     UI.fechar(); A.app.refresh(); const gerado=S.consumirRecorrente(); if(gerado)UI.toastAcao('Próximo agendamento criado para '+U.exibirData(gerado.data).slice(0,5),'Ver',()=>A.app.ir('#/servicos/'+encodeURIComponent(gerado.id))); else UI.toast('Recebimento registrado no Financeiro.');
                 } catch (erro) { botao.disabled = false; UI.toast(erro.message); }
