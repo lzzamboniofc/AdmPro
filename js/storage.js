@@ -381,8 +381,33 @@
       encerrarSessao();contaAtual=null;usuarioAtual=null;falhaSync='';avisosAtivos=[];ultimoAcesso=0;
       atualizarIndicador();
     }
+    function limparCacheEmpresa(userId,contaId){
+      if(!userId||!contaId)return;
+      const prefixo=PREFIXO+userId+'_'+contaId+'_';
+      const chaves=Array.from({length:localStorage.length},(_,i)=>localStorage.key(i));
+      chaves.filter(k=>k?.startsWith(prefixo)).forEach(k=>localStorage.removeItem(k));
+      if(usuarioAtual===userId&&contaAtual===contaId){
+        encerrarSessao();contaAtual=null;usuarioAtual=null;
+        falhaSync='';avisosAtivos=[];ultimoAcesso=0;
+      }
+      atualizarIndicador();
+    }
     function aplicarEscopo(perms={},membro={}){
       if(!contaAtual||navigator.onLine===false)return;
+      const marca=chaveCache('_permissoesEfetivas');
+      const atual=JSON.stringify(perms),anterior=localStorage.getItem(marca);
+      if(anterior!==atual){
+        // Nunca reutiliza dados completos após a redução de acesso.
+        // PIN e nome local permanecem; os demais dados serão relidos já filtrados pela API.
+        for(const col of COLECOES.filter(x=>x!=='config'))
+          localStorage.removeItem(chaveCache(col));
+        const pend=fila().length;
+        salvarJSON(filaKey(),[]);
+        localStorage.removeItem(marcasKey());
+        localStorage.setItem(cursorKey(),'1970-01-01T00:00:00.000Z');
+        if(pend)A.ui?.toast('As permissões mudaram: alterações locais não sincronizadas foram descartadas.');
+        localStorage.setItem(marca,atual);
+      }
       const remover=col=>localStorage.removeItem(chaveCache(col));
       if(!perms['financeiro.ver']){remover('lancamentos');remover('despesasFixas')}
       if(!perms['estoque.ver'])remover('movimentacoesEstoque');
@@ -702,7 +727,7 @@
     function vinculosCacheUsuario(userId){return carregarJSON(PREFIXO+'vinculos_'+userId,[])}
     function definirContaPreferida(userId,contaId){localStorage.setItem(PREFIXO+'contaPreferida_'+userId,contaId)}
     function contaPreferida(userId){return localStorage.getItem(PREFIXO+'contaPreferida_'+userId)||''}
-    A.storage = { obter, gravar, lista, porId, adicionar, atualizar, excluir, removerServico, exportar, validarBackup, importar, limpar, exemplo, problemas, migrarDados, hashPin, verificarPin, definirPin, sessaoAtiva, abrirSessao, encerrarSessao, bloqueioRestante, registrarErroPin, registrarPagamento, estornarPagamento, movimentarEstoque, sincronizarServico, consumirRecorrente, gerarDespesasFixas, numeroRecibo, registrarLembrete, usarConta, limparCacheConta, pendentes, estadoSync, sincronizar, registrarAcesso, dadosAssinatura, carregarAvisos, avisosHTML, bindAvisos, enviarFeedback, listarFeedbacks, atualizarDadosConta, possuiLegado, importarLegado, guardarContaUsuario, contaCacheUsuario, guardarVinculosUsuario, vinculosCacheUsuario, definirContaPreferida, contaPreferida, aplicarEscopo };
+    A.storage = { obter, gravar, lista, porId, adicionar, atualizar, excluir, removerServico, exportar, validarBackup, importar, limpar, exemplo, problemas, migrarDados, hashPin, verificarPin, definirPin, sessaoAtiva, abrirSessao, encerrarSessao, bloqueioRestante, registrarErroPin, registrarPagamento, estornarPagamento, movimentarEstoque, sincronizarServico, consumirRecorrente, gerarDespesasFixas, numeroRecibo, registrarLembrete, usarConta, limparCacheConta, limparCacheEmpresa, pendentes, estadoSync, sincronizar, registrarAcesso, dadosAssinatura, carregarAvisos, avisosHTML, bindAvisos, enviarFeedback, listarFeedbacks, atualizarDadosConta, possuiLegado, importarLegado, guardarContaUsuario, contaCacheUsuario, guardarVinculosUsuario, vinculosCacheUsuario, definirContaPreferida, contaPreferida, aplicarEscopo };
 })(window.AdmPro = window.AdmPro || {});
 
 /* ADMPRO-SUPABASE-INTEGRADO */
