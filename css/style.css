@@ -1802,3 +1802,14 @@ body:has(#topbar[hidden]) .tela-seguranca .marca-vertical {
  .tutorial-ajuda-extra>.btn{width:100%}
  .equipe-limite>.btn{justify-self:stretch}
 }
+
+/* Convites e edição de profissionais em cards compactos sem rolagem lateral. */
+.equipe-profissional-card{flex-wrap:wrap;gap:10px}
+.equipe-profissional-card>.grow{flex:1 1 190px;min-width:0}
+.equipe-profissional-card>[data-editar-prof],
+.equipe-profissional-card>[data-acesso-prof]{min-height:44px}
+@media(max-width:540px){
+ .equipe-profissional-card>.grow{flex:1 1 100%;width:100%}
+ .equipe-profissional-card>[data-editar-prof],
+ .equipe-profissional-card>[data-acesso-prof]{flex:1 1 120px}
+}
