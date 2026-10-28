@@ -1,5 +1,5 @@
 /* PWA: cache-first de arquivos estáticos do mesmo escopo. Sem acesso a dados privados. */
-const CACHE = 'admpro-estaticos-v11-checkout-pix';
+const CACHE = 'admpro-estaticos-v12-pix-notificacoes';
 const ARQUIVOS = [
   "./index.html",
   "./css/style.css",
