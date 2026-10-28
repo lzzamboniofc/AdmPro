@@ -663,10 +663,11 @@
         sb.from('planos').select('*').eq('id',c.plano_id).single(),
         sb.from('pagamentos').select('*').eq('conta_id',c.id).order('criado_em',{ascending:false}),
         sb.from('config_sistema').select('chave,valor'),
-        sb.from('planos').select('*').eq('ativo',true).order('ordem')
+        sb.from('planos').select('*').eq('ativo',true).order('ordem'),
+        sb.from('pedidos_plano').select('*').eq('conta_id',c.id).order('criado_em',{ascending:false}).limit(12)
       ]);
       for(const r of rs)if(r.error)throw r.error;
-      return {conta:c,plano:rs[0].data,pagamentos:rs[1].data||[],config:Object.fromEntries((rs[2].data||[]).map(v=>[v.chave,v.valor])),planos:rs[3].data||[]};
+      return {conta:c,plano:rs[0].data,pagamentos:rs[1].data||[],config:Object.fromEntries((rs[2].data||[]).map(v=>[v.chave,v.valor])),planos:rs[3].data||[],pedidos:rs[4].data||[]};
     }
     async function carregarAvisos(){
       if(!contaAtual||navigator.onLine===false)return avisosAtivos;
