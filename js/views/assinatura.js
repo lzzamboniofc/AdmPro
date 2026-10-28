@@ -16,7 +16,7 @@ function render(){
  const dias=c.trial_ate?Math.max(0,Math.ceil((new Date(c.trial_ate+'T12:00:00')-new Date())/86400000)):0;
  const contratado=c.preco_acordado_centavos==null?p.preco_mensal_centavos:c.preco_acordado_centavos;
  const pago=Number(contratado||0)>0;
- const pix=pago&&!!config.pix_chave&&!!config.pix_nome_recebedor;
+ const pix=pago&&c.status_assinatura!=='trial'&&!!config.pix_chave&&!!config.pix_nome_recebedor;
  const cards=(planos||[]).map(v=>{
    const atual=v.id===p.id;
    return '<div class="plano-assinatura-card'+(atual?' atual':'')+'"><div class="plano-assinatura-cabecalho"><strong>'+U.escapar(v.nome)+'</strong>'+(atual?'<span class="plano-assinatura-atual">Seu plano</span>':'')+'</div>'+
@@ -26,7 +26,7 @@ function render(){
  }).join('');
  return '<div class="page-heading"><div><h1>Minha assinatura</h1><p class="muted">Consulte seu plano, os vencimentos e as opções disponíveis.</p></div><a class="btn secundario" href="#/config">Voltar</a></div>'+
  UI.card('<p><b>Plano atual:</b> '+U.escapar(p.nome)+'</p><p><b>Situação:</b> '+U.escapar(nomes[c.status_assinatura]||c.status_assinatura)+'</p>'+
- '<p><b>Mensalidade contratada:</b> '+dinheiro(contratado)+'</p>'+
+ '<p><b>'+(c.status_assinatura==='trial'?'Valor após o teste':'Mensalidade contratada')+':</b> '+dinheiro(contratado)+'</p>'+
  (c.status_assinatura==='trial'?'<p>Seu teste termina em '+dias+' dia(s). Após o teste, o acesso passa ao plano Grátis, a menos que você contrate outro plano.</p>':'')+
  '<p><b>Próximo vencimento:</b> '+data(c.proximo_vencimento)+'</p>'+
  '<p><b>Limites:</b> '+(p.limite_clientes??'Ilimitados')+' clientes · '+(p.limite_servicos_mes??'Ilimitados')+' serviços/mês</p>')+
