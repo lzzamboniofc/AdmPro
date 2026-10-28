@@ -1520,3 +1520,17 @@ body:has(#topbar[hidden]) .tela-seguranca .marca-vertical {
 .plano-assinatura-card>button{align-self:flex-start;margin-top:auto}
 @media(min-width:1150px){.planos-assinatura-grade{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:560px){.planos-assinatura-grade{grid-template-columns:1fr}.plano-assinatura-card{padding:16px}}
+
+/* Checkout Pix: pedido e pagamento nunca se confundem com ativação. */
+.pedido-plano-section{margin:20px 0}
+.pedido-plano-situacao{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.pedido-plano-status{display:inline-flex;border-radius:999px;padding:5px 11px;background:var(--alerta-fundo);border:1px solid var(--alerta-borda);color:var(--alerta-texto);font-weight:700;font-size:12px}
+.pedido-plano-status.pedido-analise{background:var(--info-fundo);color:var(--info-texto);border-color:var(--info-borda)}
+.pedido-plano-pix{background:var(--primaria-suave);border:1px solid var(--borda);border-radius:12px;padding:15px 17px;margin:14px 0}
+.pedido-plano-pix code{display:inline-block;overflow-wrap:anywhere;word-break:break-word;font-size:.91rem;max-width:100%}
+.pedido-plano-pix p{margin:7px 0;line-height:1.5}
+.pedido-plano-section .actions{display:flex;flex-wrap:wrap;gap:9px;margin:13px 0}
+.pedido-plano-section .actions button{max-width:100%;white-space:normal}
+.pedido-plano-situacao.pedido-ok strong{color:var(--sucesso-texto)}
+.pedido-plano-situacao.pedido-recusado strong{color:var(--erro)}
+@media(max-width:560px){.pedido-plano-section .actions .btn{flex:1 1 100%}}
