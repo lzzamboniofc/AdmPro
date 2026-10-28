@@ -1534,3 +1534,6 @@ body:has(#topbar[hidden]) .tela-seguranca .marca-vertical {
 .pedido-plano-situacao.pedido-ok strong{color:var(--sucesso-texto)}
 .pedido-plano-situacao.pedido-recusado strong{color:var(--erro)}
 @media(max-width:560px){.pedido-plano-section .actions .btn{flex:1 1 100%}}
+
+/* Configurações são acessadas pelo menu da foto do usuário, não por botão solto no topo. */
+.topbar-config { display:none!important; }
