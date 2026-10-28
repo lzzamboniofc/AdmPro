@@ -1365,6 +1365,11 @@ body.modal-aberto { position:static; top:auto!important; width:auto; overflow:hi
   overflow-wrap:anywhere
 }
 .admpro-aviso p { margin:4px 0 0; white-space:pre-wrap; overflow-wrap:anywhere }
+.admpro-aviso.prioridade-alta { border-left:4px solid var(--alerta); }
+.admpro-aviso.prioridade-critica { border:2px solid var(--erro); border-left-width:5px; }
+.admpro-aviso.prioridade-baixa { border-left:4px solid var(--sucesso); }
+.admpro-aviso .aviso-assinatura-link { display:inline-block; margin-top:9px; font-size:.86rem; font-weight:700; color:inherit; text-decoration:underline; text-underline-offset:3px; }
+.admpro-aviso .icon-button { flex-shrink:0; }
 .admpro-banner {
   padding:12px 16px;
   margin-bottom:16px;
