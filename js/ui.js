@@ -42,7 +42,28 @@
         div.append(fecharAviso); root.append(div);
         if (!acao) timerToast = setTimeout(() => root.replaceChildren(), 5000);
     }
-    function toast(texto) { mostrarToast(texto); }
+    function toast(texto) {
+      // Uma conta suspensa não deve expor mensagens técnicas de banco ao assinante.
+      if(/CONTA_BLOQUEADA|assinatura bloqueada|conta bloqueada/i.test(String(texto||''))) {
+        const root=$('#toast-root');
+        clearTimeout(timerToast);root.replaceChildren();
+        const aviso=document.createElement('aside');
+        aviso.className='toast toast-bloqueio';
+        aviso.setAttribute('role','alert');
+        const icone=document.createElement('span');icone.className='toast-bloqueio-icone';icone.textContent='!';
+        const corpo=document.createElement('div');corpo.className='toast-bloqueio-conteudo';
+        const titulo=document.createElement('strong');titulo.textContent='Conta temporariamente bloqueada';
+        const descricao=document.createElement('p');descricao.textContent='Você pode consultar seus dados, mas novas alterações estão suspensas. Confira sua assinatura para regularizar o acesso.';
+        const link=document.createElement('a');link.href='#/assinatura';link.className='toast-bloqueio-acao';link.textContent='Ver minha assinatura →';
+        corpo.append(titulo,descricao,link);
+        const fecharAviso=document.createElement('button');fecharAviso.type='button';fecharAviso.className='toast-fechar';
+        fecharAviso.setAttribute('aria-label','Fechar aviso');fecharAviso.textContent='×';
+        fecharAviso.onclick=()=>root.replaceChildren();
+        aviso.append(icone,corpo,fecharAviso);root.append(aviso);
+        return;
+      }
+      mostrarToast(texto);
+    }
     let focoAnterior = null, yAnterior = 0;
     function fechar() {
         const root = $('#modal-root');
