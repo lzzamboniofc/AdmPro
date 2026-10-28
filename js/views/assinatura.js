@@ -86,7 +86,7 @@ function render(){
  '<p><b>'+(c.status_assinatura==='trial'?'Valor após o teste':'Mensalidade contratada')+':</b> '+dinheiro(contratado)+'</p>'+
  (c.status_assinatura==='trial'?'<p>Seu período de teste termina em '+dias+' dia(s). Sem contratação, o acesso passa para o plano Grátis.</p>':'')+
  '<p><b>Próximo vencimento:</b> '+data(c.proximo_vencimento)+'</p>'+
- '<p><b>Limites:</b> '+(p.limite_clientes??'Ilimitados')+' clientes · '+(p.limite_servicos_mes??'Ilimitados')+' serviços/mês</p>')+
+ '<p><b>Limites:</b> '+(p.limite_clientes??'Ilimitados')+' clientes · '+(p.limite_servicos_mes??'Ilimitados')+' serviços/mês</p>','assinatura-resumo')+
  pedidoHTML()+
  '<section class="section"><h2>Planos disponíveis</h2><div class="planos-assinatura-grade">'+cards+'</div>'+
  '<p class="muted">Ao escolher um plano pago, o valor será cobrado integralmente e o novo ciclo mensal começa na data do Pix confirmado. Não há cálculo proporcional nesta etapa.</p></section>'+
