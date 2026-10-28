@@ -3,6 +3,7 @@
 'use strict';
 const U=A.utils,UI=A.ui,S=A.storage;
 let equipe={membros:[],convites:[]};
+let limiteEquipe=null;
 const papelNome={dono:'Proprietário',gerente:'Gerente',recepcionista:'Recepcionista',profissional:'Profissional'};
 const esc=U.escapar;
 function profissionais(){return S.lista('profissionais').slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'))}
@@ -13,7 +14,7 @@ function listaProfissionais(){
    const foto=/^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(p.fotoBase64||'')
      ? '<img class="foto-profissional" src="'+esc(p.fotoBase64)+'" alt="">'
      : '<span class="cor-profissional" style="background:'+esc(p.cor||'#0E5A6B')+'"></span>';
-   return '<article class="list-card"><div class="grow"><div class="inline-row">'+foto+'<h3>'+esc(p.nome)+'</h3>'+(!p.ativo?'<span class="chip cancelado">Inativo</span>':'')+'</div><p class="item-meta">'+esc([p.funcao,p.especialidade,p.telefone].filter(Boolean).join(' · ')||'Profissional cadastrado')+'</p></div>'+(A.permissoes.pode('equipe.editar')?'<button type="button" class="btn secundario compacto" data-editar-prof="'+esc(p.id)+'">Editar</button>':'')+'</article>';
+   return '<article class="list-card"><div class="grow"><div class="inline-row">'+foto+'<h3>'+esc(p.nome)+'</h3>'+(!p.ativo?'<span class="chip cancelado">Inativo</span>':'')+'</div><p class="item-meta">'+esc([p.funcao,p.especialidade,p.telefone].filter(Boolean).join(' · ')||'Profissional cadastrado')+'</p></div>'+(A.permissoes.pode('equipe.editar')?'<button type="button" class="btn secundario compacto" data-editar-prof="'+esc(p.id)+'">Editar</button>':'')+(A.permissoes.pode('convites.gerenciar')&&p.ativo!==false?'<button type="button" class="btn secundario compacto" data-acesso-prof="'+esc(p.id)+'">Dar acesso</button>':'')+'</article>';
  }).join(''):UI.vazio('Nenhum profissional','Cadastre quem realiza atendimentos. O profissional não precisa ter login.',A.permissoes.pode('equipe.editar')?'Adicionar profissional':'',A.permissoes.pode('equipe.editar')?'novoProfissional':'');
 }
 function render(){
@@ -77,12 +78,17 @@ function mostrarLink(id){
  const link=linkConvite(id);
  UI.modal('Convite pronto','<p>Envie este link para a pessoa convidada. Ela deverá entrar ou criar a conta com o mesmo e-mail informado.</p><label class="field"><span class="label">Link do convite</span><input id="link-convite" readonly value="'+esc(link)+'"></label><button class="btn" type="button" id="copiar-convite">Copiar link</button>',sheet=>{sheet.querySelector('#copiar-convite').onclick=async()=>{try{await navigator.clipboard.writeText(link);UI.toast('Link copiado.')}catch(_){const i=sheet.querySelector('#link-convite');i.select();document.execCommand('copy');UI.toast('Link copiado.')}}});
 }
-function abrirConvite(){
- const html='<form id="form-convite" class="form-grid">'+UI.campo('E-mail','email','',{required:true,type:'email'})+
+function abrirConvite(profissionalId='',emailInicial=''){
+ if(limiteEquipe && limiteEquipe.limite!=null && limiteEquipe.disponiveis<=0){
+   UI.modal('Limite de usuários atingido','<p>Seu plano '+esc(limiteEquipe.plano)+' permite até <strong>'+limiteEquipe.limite+' usuários com login</strong>, incluindo o proprietário e convites pendentes.</p><p>Profissionais sem login continuam disponíveis sem limite. Para enviar novos convites, cancele um convite pendente, revogue um acesso ou mude de plano.</p><a class="btn" href="#/assinatura" id="ver-planos-equipe">Ver planos</a>',sheet=>{sheet.querySelector('#ver-planos-equipe').onclick=UI.fechar});
+   return;
+ }
+
+ const html='<form id="form-convite" class="form-grid">'+UI.campo('E-mail','email',emailInicial,{required:true,type:'email'})+
  UI.campo('Perfil','papel','recepcionista',{options:[{value:'gerente',label:'Gerente'},{value:'recepcionista',label:'Recepcionista'},{value:'profissional',label:'Profissional'}]})+
- '<label class="field"><span class="label">Profissional associado (opcional)</span><select name="profissionalId">'+opProfissionais()+'</select></label>'+permissoesExtras()+
+ '<label class="field"><span class="label">Profissional associado (opcional)</span><select name="profissionalId">'+opProfissionais(profissionalId)+'</select></label>'+permissoesExtras()+
  '<button class="btn" type="submit">Criar convite</button></form>';
- UI.modal('Convidar usuário',html,sheet=>{const f=sheet.querySelector('form');f.onsubmit=async e=>{e.preventDefault();const b=f.querySelector('[type=submit]');b.disabled=true;try{await S.sincronizar();const d=new FormData(f),r=await A.auth.client.rpc('criar_convite',{p_conta:A.auth.conta.id,p_email:d.get('email'),p_papel:d.get('papel'),p_profissional_id:d.get('profissionalId')||null,p_permissoes:extrasDo(sheet)});if(r.error)throw r.error;UI.fechar();mostrarLink(r.data);await carregarEquipe(document.getElementById('conteudo'));}catch(err){UI.toast(err.message);b.disabled=false}}});
+ UI.modal('Convidar usuário',html,sheet=>{const f=sheet.querySelector('form');f.onsubmit=async e=>{e.preventDefault();const b=f.querySelector('[type=submit]');b.disabled=true;try{await S.sincronizar();const d=new FormData(f),r=await A.auth.client.rpc('criar_convite',{p_conta:A.auth.conta.id,p_email:d.get('email'),p_papel:d.get('papel'),p_profissional_id:d.get('profissionalId')||null,p_permissoes:extrasDo(sheet)});if(r.error)throw r.error;UI.fechar();mostrarLink(r.data);await carregarEquipe(document.getElementById('conteudo'));}catch(err){UI.toast(/LIMITE_USUARIOS/.test(err.message)?'Limite de usuários do plano atingido. Veja Minha assinatura para aumentar o limite.':err.message);b.disabled=false}}});
 }
 function editarMembro(m){
  const html='<form class="form-grid"><p><strong>'+esc(m.email)+'</strong></p>'+UI.campo('Perfil','papel',m.papel,{options:[{value:'gerente',label:'Gerente'},{value:'recepcionista',label:'Recepcionista'},{value:'profissional',label:'Profissional'}]})+
@@ -91,12 +97,27 @@ function editarMembro(m){
 }
 function acessosHTML(){
  const membros=equipe.membros||[],conv=equipe.convites||[];
- return UI.card('<div class="stack">'+(membros.length?membros.map(m=>'<article class="list-card"><div class="grow"><h3>'+esc(m.email)+'</h3><p class="item-meta">'+esc(papelNome[m.papel]||m.papel)+(m.profissional_id?' · agenda vinculada':'')+(m.ativo===false?' · acesso revogado':'')+'</p></div><div class="item-actions">'+(m.papel!=='dono'&&A.permissoes.pode('equipe.editar')?'<button class="btn secundario compacto" data-editar-membro="'+esc(m.user_id)+'">Editar</button><button class="btn secundario compacto" data-revogar="'+esc(m.user_id)+'">Revogar</button>':'')+'</div></article>').join(''):'<p class="muted">Nenhum usuário.</p>')+
+ const l=limiteEquipe;
+ const limite=l?.limite;
+ const resumo=l?'<div class="equipe-limite">'+
+  '<div class="equipe-limite-topo"><div><strong>Vagas de acesso · '+esc(l.plano||'Plano atual')+'</strong>'+
+  '<p class="muted">'+l.ativos+' usuário(s) ativo(s)'+(l.convites?' · '+l.convites+' convite(s) pendente(s)':'')+
+  ' · proprietário incluso</p></div><span class="equipe-limite-numero">'+l.ocupados+' / '+(limite==null?'Ilimitado':limite)+'</span></div>'+
+  (limite==null?'<p class="muted">Seu plano permite usuários ilimitados.</p>':
+    '<div class="equipe-limite-trilha" role="progressbar" aria-label="Vagas de acesso utilizadas" aria-valuenow="'+Math.min(l.ocupados,limite)+'" aria-valuemin="0" aria-valuemax="'+limite+'"><span style="width:'+Math.min(100,Math.round(100*l.ocupados/Math.max(1,limite)))+'%"></span></div>'+
+    (l.disponiveis>0?'<p class="muted">Restam '+l.disponiveis+' vaga(s) para novos convites.</p>':'<p class="equipe-limite-alerta">Limite atingido. Os acessos existentes continuam ativos; novos convites exigem uma vaga livre ou outro plano.</p>'))+
+  '<a class="btn secundario compacto" href="#/assinatura">Consultar planos</a></div>':'';
+ return (resumo?UI.card(resumo):'')+UI.card('<div class="stack">'+(membros.length?membros.map(m=>'<article class="list-card"><div class="grow"><h3>'+esc(m.email)+'</h3><p class="item-meta">'+esc(papelNome[m.papel]||m.papel)+(m.profissional_id?' · agenda vinculada':'')+(m.ativo===false?' · acesso revogado':'')+'</p></div><div class="item-actions">'+(m.papel!=='dono'&&A.permissoes.pode('equipe.editar')?'<button class="btn secundario compacto" data-editar-membro="'+esc(m.user_id)+'">Editar</button><button class="btn secundario compacto" data-revogar="'+esc(m.user_id)+'">Revogar</button>':'')+'</div></article>').join(''):'<p class="muted">Nenhum usuário.</p>')+
  (conv.length?'<div class="divider"></div><h3>Convites pendentes</h3>'+conv.map(i=>'<article class="list-card"><div class="grow"><strong>'+esc(i.email)+'</strong><p class="item-meta">'+esc(papelNome[i.papel]||i.papel)+' · expira '+new Date(i.expira_em).toLocaleDateString('pt-BR')+'</p></div><div class="item-actions"><button class="btn secundario compacto" data-reenviar="'+esc(i.id)+'">Reenviar</button><button class="btn secundario compacto" data-cancelar="'+esc(i.id)+'">Cancelar</button></div></article>').join(''):'')+'</div>');
 }
 async function carregarEquipe(root){
  if(!A.permissoes.pode('equipe.ver'))return;
- const r=await A.auth.client.rpc('listar_equipe',{p_conta:A.auth.conta.id});if(r.error){UI.toast(r.error.message);return}
+ const [r,lim]=await Promise.all([
+  A.auth.client.rpc('listar_equipe',{p_conta:A.auth.conta.id}),
+  A.auth.client.rpc('resumo_limite_equipe',{p_conta:A.auth.conta.id})
+ ]);
+ if(r.error){UI.toast(r.error.message);return}
+ limiteEquipe=lim.error?null:lim.data;
  equipe=r.data||{membros:[],convites:[]};const box=root.querySelector('#equipe-acessos');if(!box)return;box.innerHTML=acessosHTML();
  box.querySelectorAll('[data-editar-membro]').forEach(b=>b.onclick=()=>editarMembro(equipe.membros.find(m=>m.user_id===b.dataset.editarMembro)));
  box.querySelectorAll('[data-revogar]').forEach(b=>b.onclick=()=>UI.confirmar('Revogar acesso?','A pessoa deixará de acessar esta empresa. O profissional e o histórico de atendimentos não serão apagados.',async()=>{const r=await A.auth.client.rpc('revogar_membro',{p_conta:A.auth.conta.id,p_user:b.dataset.revogar});if(r.error){UI.toast(r.error.message);return}await carregarEquipe(root);UI.toast('Acesso revogado.');},'Revogar'));
@@ -107,7 +128,8 @@ function bind(root){
  root.querySelector('[data-novo-prof]')?.addEventListener('click',()=>abrirProfissional());
  root.querySelector('[data-action="novoProfissional"]')?.addEventListener('click',()=>abrirProfissional());
  root.querySelectorAll('[data-editar-prof]').forEach(b=>b.onclick=()=>abrirProfissional(b.dataset.editarProf));
- root.querySelector('[data-convidar]')?.addEventListener('click',abrirConvite);
+ root.querySelectorAll('[data-acesso-prof]').forEach(b=>b.onclick=()=>{const p=S.porId('profissionais',b.dataset.acessoProf);if(p)abrirConvite(p.id,p.email||'')});
+ root.querySelector('[data-convidar]')?.addEventListener('click',()=>abrirConvite());
  carregarEquipe(root).catch(e=>UI.toast(e.message));
 }
 A.views=A.views||{};A.views.equipe={render,bind,abrirProfissional};
