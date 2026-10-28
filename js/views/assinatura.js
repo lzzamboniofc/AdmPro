@@ -44,7 +44,7 @@ function pedidoHTML(){
   '<button type="button" class="btn secundario" id="cancelar-pedido-plano">Cancelar pedido</button></div>':
   '<p>Recebemos sua informação de pagamento. A equipe vai conferir o recebimento no extrato e liberar o plano escolhido.</p>'+
   (p.declaracao_cliente?'<p><b>Dados informados:</b> '+U.escapar(p.declaracao_cliente)+'</p>':'')+
-  '<p class="muted">Enquanto o pagamento não for confirmado no AdmPro Console, seu plano e seus limites atuais continuam os mesmos. Você pode atualizar a tela para consultar o resultado.</p>')+
+  '<p class="muted">Enquanto o pagamento não for confirmado pelo Administrador, seu plano e seus limites atuais continuam os mesmos. Você pode atualizar a tela para consultar o resultado.</p>')+
   '<div class="actions"><button type="button" class="btn secundario" id="atualizar-pedido-plano">Atualizar situação</button></div>')+
  '</section>';
 }
@@ -118,7 +118,7 @@ function bind(root){
         await A.auth.client.rpc('informar_pix_plano',{
            p_pedido:pedido.id,p_detalhes:new FormData(e.currentTarget).get('detalhes')||''
         }).then(r=>{if(r.error)throw r.error});
-        UI.fechar();avisar('Pagamento informado. Aguarde a confirmação no Console.');
+        UI.fechar();avisar('Pagamento informado. Aguarde a confirmação do Administrador.');
         await recarregar();
        }catch(err){b.disabled=false;avisar(err.message)}
      };
