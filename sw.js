@@ -1,5 +1,5 @@
 /* PWA: cache-first de arquivos estáticos do mesmo escopo. Sem acesso a dados privados. */
-const CACHE = 'admpro-estaticos-v14-logo-avatar';
+const CACHE = 'admpro-estaticos-v15-ajuda-equipe';
 const ARQUIVOS = [
   "./index.html",
   "./css/style.css",
@@ -14,6 +14,7 @@ const ARQUIVOS = [
   "./js/views/autenticacao.js",
   "./js/views/assinatura.js",
   "./js/views/suporte.js",
+  "./js/views/tutoriais.js",
   "./termos.html",
   "./privacidade.html",
   "./js/ui.js",
