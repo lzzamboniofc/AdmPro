@@ -1484,3 +1484,25 @@ body:has(#topbar[hidden]) .tela-seguranca .marca-vertical {
   .topbar-identidade .topbar-nome { max-width:68px }
   #indicador-sync { max-width:68px; font-size:10px }
 }
+
+/* Aviso de bloqueio não intrusivo, sempre no topo e com contraste em ambos os temas. */
+.toast.toast-bloqueio {
+  top:calc(16px + env(safe-area-inset-top));bottom:auto;
+  left:auto;right:16px;width:min(440px,calc(100vw - 32px));
+  padding:17px 14px;gap:12px;align-items:flex-start;
+  border:1px solid var(--alerta-borda);border-left:5px solid var(--alerta);
+  background:var(--alerta-fundo);color:var(--alerta-texto);
+  border-radius:15px;text-align:left;
+  box-shadow:0 16px 42px rgba(0,0,0,.17);z-index:1200;
+}
+.toast-bloqueio-icone {
+  flex:none;display:grid;place-items:center;
+  width:28px;height:28px;border-radius:50%;background:var(--alerta);
+  color:#fff;font-size:18px;font-weight:800;
+}
+.toast-bloqueio-conteudo{min-width:0;flex:1}
+.toast-bloqueio-conteudo strong{display:block;font-size:15px;line-height:1.3}
+.toast-bloqueio-conteudo p{margin:6px 0 10px;line-height:1.5;font-size:13px}
+.toast-bloqueio-acao{color:inherit!important;font-weight:800;text-decoration:underline;text-underline-offset:3px}
+.toast-bloqueio .toast-fechar{min-height:34px;min-width:34px;color:inherit}
+@media(max-width:540px){.toast.toast-bloqueio{top:calc(8px + env(safe-area-inset-top));left:10px;right:10px;width:auto}}
