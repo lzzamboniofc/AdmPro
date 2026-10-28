@@ -63,6 +63,7 @@ async function selecionarConta(id,{sincronizar=true}={}){
     await atualizarConta();
   }
   if(sincronizar&&navigator.onLine!==false)await A.storage.sincronizar();
+  if(navigator.onLine!==false)await A.storage.carregarAvisos().catch(e=>console.warn('Avisos:',e.message));
   return conta;
 }
 async function carregarConta(){
