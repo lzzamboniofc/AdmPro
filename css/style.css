@@ -1537,3 +1537,131 @@ body:has(#topbar[hidden]) .tela-seguranca .marca-vertical {
 
 /* Configurações são acessadas pelo menu da foto do usuário, não por botão solto no topo. */
 .topbar-config { display:none!important; }
+
+/* Refinamento mobile 2026-10-28: layout, legibilidade e toque; desktop preservado. */
+@media(max-width:767px) {
+  html { -webkit-text-size-adjust:100%; }
+  .topbar {
+    height:calc(58px + env(safe-area-inset-top));
+    padding:env(safe-area-inset-top) clamp(10px,3.5vw,16px) 0;
+    gap:9px;
+  }
+  .topbar-identidade {
+    display:flex;align-items:center;min-width:0;flex:1 1 auto;gap:9px;
+  }
+  .topbar-identidade .admpro-marca { flex:none;display:flex;align-items:center; }
+  .topbar-identidade .admpro-marca img { width:clamp(80px,25vw,104px);height:auto;max-height:34px; }
+  .topbar-identidade .topbar-nome {
+    display:flex;flex:1 1 auto;min-width:0;max-width:none;
+    padding-left:9px;border-left:1px solid var(--borda);font-size:13px;
+  }
+  .topbar-identidade .topbar-nome span {
+    display:block;min-width:0;max-width:100%;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .topbar-identidade .topbar-nome .logo { flex:none;width:24px;height:24px;border-radius:6px; }
+  .topbar #indicador-sync {
+    flex:0 1 auto;max-width:80px;min-width:0;max-height:40px;
+    font-size:10px;line-height:1.25;padding:5px 6px;text-align:center;
+    border-radius:9px;overflow:hidden;overflow-wrap:anywhere;
+  }
+  .topbar .user-menu { flex:none; }
+  .topbar .avatar-button {
+    width:42px;height:42px;min-width:42px;min-height:42px;
+    border-radius:50%;border:1px solid var(--borda);
+    background:var(--primaria-suave);box-shadow:0 1px 5px rgba(0,0,0,.06);
+  }
+  .user-dropdown {
+    right:0;top:calc(100% + 8px);
+    width:min(244px,calc(100vw - 24px));
+    padding:8px;border-radius:16px;box-shadow:0 14px 35px rgba(0,0,0,.16);
+  }
+  #conteudo {
+    padding:calc(76px + env(safe-area-inset-top))
+      clamp(12px,3.8vw,18px)
+      calc(108px + env(safe-area-inset-bottom));
+    width:100%;min-width:0;
+  }
+  #conteudo .page-heading {
+    gap:11px;margin-bottom:18px;align-items:center;
+  }
+  #conteudo .page-heading h1 { font-size:clamp(21px,5.8vw,26px);line-height:1.2;letter-spacing:-.025em; }
+  #conteudo .page-heading p { margin-top:6px;line-height:1.5;font-size:13.5px; }
+  #conteudo .page-heading > div { flex:1 1 205px;min-width:0; }
+  #conteudo .page-heading > .btn { min-height:44px;padding:9px 13px; }
+  #conteudo .section { margin-top:21px; }
+  #conteudo .section > h2 { font-size:19px;line-height:1.3;margin-bottom:12px; }
+  #conteudo .card {
+    padding:clamp(14px,4vw,19px);border-radius:16px;
+    box-shadow:0 2px 11px rgba(10,45,56,.045);
+  }
+  #conteudo .grid-resumo { gap:10px; }
+  #conteudo .list-card { min-width:0;gap:10px; }
+  #conteudo .btn { max-width:100%;white-space:normal;text-align:center; }
+  #conteudo .field, #conteudo .field input, #conteudo .field select { min-width:0; }
+  #conteudo .detail-row { align-items:flex-start;line-height:1.45; }
+  .navegacao {
+    height:calc(68px + env(safe-area-inset-bottom));
+    padding:4px 4px env(safe-area-inset-bottom);
+    box-shadow:0 -4px 22px rgba(0,0,0,.045);
+  }
+  .nav-item { gap:4px;min-height:56px;padding:4px 2px;font-size:11px;line-height:1.18; }
+  .nav-item svg { width:23px;height:23px; }
+  .nav-item.ativo { box-shadow:inset 0 3px 0 var(--primaria); }
+  .fab { bottom:calc(85px + env(safe-area-inset-bottom));right:16px;border-radius:18px; }
+  .sheet {
+    max-height:calc(100dvh - env(safe-area-inset-top) - 8px);
+    padding:21px clamp(15px,4vw,22px) calc(24px + env(safe-area-inset-bottom));
+    border-radius:20px 20px 0 0;
+    overscroll-behavior:contain;
+  }
+  .sheet-header { gap:12px;margin-bottom:17px; }
+  .sheet-header h2 { line-height:1.25;font-size:19px; }
+  .sheet .field input,.sheet .field select,.sheet .field textarea { font-size:16px; }
+  #toast-root { padding-inline:10px; }
+  #toast-root .toast { border-radius:13px;max-width:100%;font-size:13px;line-height:1.4; }
+  .planos-assinatura-grade {
+    grid-template-columns:1fr;gap:12px;margin:14px 0 10px;
+  }
+  .plano-assinatura-card {
+    padding:17px 16px;gap:9px;border-radius:17px;
+  }
+  .plano-assinatura-card.atual { border-width:2px; }
+  .plano-assinatura-cabecalho strong { font-size:17px; }
+  .plano-assinatura-preco { font-size:26px;margin:3px 0!important;line-height:1.2; }
+  .plano-assinatura-card > p:not(.plano-assinatura-preco) { font-size:13px;line-height:1.5; }
+  .plano-assinatura-card > button { width:100%;min-height:46px;align-self:stretch;margin-top:5px; }
+  .assinatura-resumo {
+    border-left:4px solid var(--primaria);background:var(--superficie);
+  }
+  .assinatura-resumo p { line-height:1.5;font-size:14px; }
+  .assinatura-resumo p + p { margin-top:11px; }
+  .assinatura-resumo b { font-weight:700; }
+  .pedido-plano-section { margin:18px 0 22px; }
+  .pedido-plano-section .card { border-color:var(--info-borda); }
+  .pedido-plano-situacao { display:flex;align-items:flex-start;flex-direction:column;gap:8px; }
+  .pedido-plano-status { display:inline-flex;align-self:flex-start;line-height:1.35;padding:6px 11px; }
+  .pedido-plano-pix {
+    padding:15px;border-radius:14px;margin:13px 0;
+  }
+  .pedido-plano-pix code { display:block;padding:9px 10px;margin-top:7px;
+    border-radius:9px;background:var(--superficie);border:1px solid var(--borda);
+    font-size:13px;line-height:1.45;user-select:all; }
+  .pedido-plano-section .actions { display:grid;grid-template-columns:1fr;gap:9px; }
+  .pedido-plano-section .actions > button { width:100%;min-height:46px; }
+}
+@media(max-width:370px) {
+  .topbar { padding-inline:9px;gap:6px; }
+  .topbar-identidade { gap:6px; }
+  .topbar-identidade .admpro-marca img { width:77px; }
+  .topbar-identidade .topbar-nome { padding-left:6px;font-size:12px; }
+  .topbar #indicador-sync { max-width:62px;font-size:9px;padding:4px; }
+  .topbar .avatar-button { width:40px;height:40px;min-width:40px;min-height:40px; }
+  .nav-item { font-size:10.5px; }
+  .nav-item svg { width:21px;height:21px; }
+  .item-row { grid-template-columns:minmax(0,1fr) 70px 44px;gap:7px; }
+}
+@media(min-width:768px) and (max-width:1023px) {
+  .planos-assinatura-grade { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .plano-assinatura-card > button { align-self:stretch; }
+}
