@@ -519,7 +519,7 @@
       }
       const plano=A.auth?.conta?.planos||{};
       if(colecao==='clientes'&&Array.isArray(novo)&&plano.limite_clientes!=null&&novo.length>plano.limite_clientes){
-        A.ui?.modal('Limite de clientes','<p>Seu plano permite até '+plano.limite_clientes+' clientes.</p><a class="btn" href="#/assinatura">Assinar o Pro</a>');
+        A.ui?.modal('Limite de clientes','<p>Seu plano permite até '+plano.limite_clientes+' clientes.</p><a class="btn" href="#/assinatura">Ver planos</a>');
         throw Error('LIMITE_CLIENTES');
       }
       if(colecao==='servicos'&&Array.isArray(novo)&&plano.limite_servicos_mes!=null){
@@ -527,7 +527,7 @@
         const criados=novo.filter(v=>!antes.has(v.id)).length;
         const pend=fila().filter(v=>v.colecao==='servicos'&&!v.excluido&&v.novoRegistro).length;
         if(criados&&criados+pend+(A.auth?.servicosMes||0)>plano.limite_servicos_mes){
-          A.ui?.modal('Limite mensal','<p>Seu plano permite '+plano.limite_servicos_mes+' serviços/mês.</p><a class="btn" href="#/assinatura">Assinar o Pro</a>');
+          A.ui?.modal('Limite mensal','<p>Seu plano permite '+plano.limite_servicos_mes+' serviços/mês.</p><a class="btn" href="#/assinatura">Ver planos</a>');
           throw Error('LIMITE_SERVICOS_MES');
         }
       }
@@ -580,7 +580,8 @@
               continue;
             }
             falhaSync=error.message;
-            if(/LIMITE_/i.test(error.message))A.ui?.modal('Limite do plano','<p>'+U.escapar(error.message)+'</p><a class="btn" href="#/assinatura">Assinar o Pro</a>');
+             if(/CONTA_BLOQUEADA/i.test(error.message))A.ui?.toast(error.message);
+            if(/LIMITE_/i.test(error.message))A.ui?.modal('Limite do plano','<p>'+U.escapar(error.message)+'</p><a class="btn" href="#/assinatura">Ver planos</a>');
             break;
           }
           const marcas=carregarJSON(marcasKey(),{});marcas[item.colecao+':'+item.id]=data;salvarJSON(marcasKey(),marcas);
@@ -595,7 +596,7 @@
           }
         }
         if(cid===contaAtual){await buscarMudancas();await A.auth.atualizarConta();}
-      }finally{sincronizando=false;atualizarIndicador();if(fila().length&&navigator.onLine!==false)agendarSync()}
+      }finally{sincronizando=false;atualizarIndicador();if(fila().length&&navigator.onLine!==false&&!/CONTA_BLOQUEADA/i.test(falhaSync))agendarSync()}
     }
     async function buscarMudancas(){
       if(!contaAtual)return;
@@ -662,10 +663,10 @@
         sb.from('planos').select('*').eq('id',c.plano_id).single(),
         sb.from('pagamentos').select('*').eq('conta_id',c.id).order('criado_em',{ascending:false}),
         sb.from('config_sistema').select('chave,valor'),
-        sb.from('planos').select('*').eq('nome','Pro').eq('ativo',true).maybeSingle()
+        sb.from('planos').select('*').eq('ativo',true).order('ordem')
       ]);
       for(const r of rs)if(r.error)throw r.error;
-      return {conta:c,plano:rs[0].data,pagamentos:rs[1].data||[],config:Object.fromEntries((rs[2].data||[]).map(v=>[v.chave,v.valor])),pro:rs[3].data};
+      return {conta:c,plano:rs[0].data,pagamentos:rs[1].data||[],config:Object.fromEntries((rs[2].data||[]).map(v=>[v.chave,v.valor])),planos:rs[3].data||[]};
     }
     async function carregarAvisos(){
       if(!contaAtual||navigator.onLine===false)return avisosAtivos;
