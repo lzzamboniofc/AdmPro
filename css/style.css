@@ -1506,3 +1506,17 @@ body:has(#topbar[hidden]) .tela-seguranca .marca-vertical {
 .toast-bloqueio-acao{color:inherit!important;font-weight:800;text-decoration:underline;text-underline-offset:3px}
 .toast-bloqueio .toast-fechar{min-height:34px;min-width:34px;color:inherit}
 @media(max-width:540px){.toast.toast-bloqueio{top:calc(8px + env(safe-area-inset-top));left:10px;right:10px;width:auto}}
+
+/* Comparador de planos no painel de assinatura. */
+.planos-assinatura-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin:15px 0}
+.plano-assinatura-card{min-width:0;padding:19px;background:var(--superficie);border:1px solid var(--borda);border-radius:15px;box-shadow:var(--sombra);display:flex;flex-direction:column;gap:10px}
+.plano-assinatura-card.atual{border:2px solid var(--primaria);background:var(--primaria-suave)}
+.plano-assinatura-cabecalho{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.plano-assinatura-cabecalho strong{font-size:1.12rem}
+.plano-assinatura-atual{font-size:12px;font-weight:800;border-radius:999px;padding:4px 9px;background:var(--primaria);color:var(--superficie)}
+.plano-assinatura-preco{font-size:1.65rem;font-weight:850;letter-spacing:-.04em;margin:4px 0!important}
+.plano-assinatura-preco small{font-size:.79rem;font-weight:550;color:var(--texto-secundario);letter-spacing:0;margin-left:4px}
+.plano-assinatura-card>p:not(.plano-assinatura-preco){font-size:.87rem;color:var(--texto-secundario);margin:0;line-height:1.4}
+.plano-assinatura-card>button{align-self:flex-start;margin-top:auto}
+@media(min-width:1150px){.planos-assinatura-grade{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:560px){.planos-assinatura-grade{grid-template-columns:1fr}.plano-assinatura-card{padding:16px}}
