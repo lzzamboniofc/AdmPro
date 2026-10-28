@@ -118,7 +118,7 @@ function bind(root){
         await A.auth.client.rpc('informar_pix_plano',{
            p_pedido:pedido.id,p_detalhes:new FormData(e.currentTarget).get('detalhes')||''
         }).then(r=>{if(r.error)throw r.error});
-        UI.fechar();avisar('Pagamento informado. Aguarde a confirmação do Administrador.');
+        UI.fechar();avisar('Pix informado ao Administrador. O pedido aguarda conferência.');
         await recarregar();
        }catch(err){b.disabled=false;avisar(err.message)}
      };
