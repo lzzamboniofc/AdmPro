@@ -670,15 +670,50 @@
     async function carregarAvisos(){
       if(!contaAtual||navigator.onLine===false)return avisosAtivos;
       const id=contaAtual;
-      const {data,error}=await A.auth.client.from('avisos').select('id,titulo,mensagem,tipo').order('inicio',{ascending:false});
-      if(error)throw error;
+      const dono=A.auth.membro?.papel==='dono'&&A.auth.membro?.ativo!==false;
+      const pedidos=[A.auth.client.from('avisos').select('id,titulo,mensagem,tipo').order('inicio',{ascending:false})];
+      if(dono)pedidos.push(A.auth.client.rpc('meus_alertas_automaticos',{p_conta:id}));
+      const resultados=await Promise.all(pedidos);
+      if(resultados[0].error)throw resultados[0].error;
       if(id!==contaAtual)return [];
       const fechados=new Set(carregarJSON(fechadosKey(),[]));
-      avisosAtivos=(data||[]).filter(v=>!fechados.has(v.id));
+      const manuais=(resultados[0].data||[]).filter(v=>!fechados.has(v.id));
+      const automáticos=resultados[1];
+      if(automáticos?.error)console.warn('Avisos automáticos:',automáticos.error.message);
+      const alertas=automáticos?.error?[]:(automáticos?.data||[]).map(v=>({
+        ...v,id:'auto-'+v.id,entregaId:v.id,automatico:true
+      }));
+      avisosAtivos=[...alertas,...manuais];
       return avisosAtivos;
     }
-    function avisosHTML(){return avisosAtivos.map(a=>'<aside class="admpro-aviso '+(a.tipo==='alerta'?'alerta':'')+'" role="status"><div><strong>'+U.escapar(a.titulo)+'</strong><p>'+U.escapar(a.mensagem)+'</p></div><button class="icon-button" data-fechar-aviso="'+U.escapar(a.id)+'" aria-label="Fechar aviso">×</button></aside>').join('')}
-    function bindAvisos(root){root.querySelectorAll('[data-fechar-aviso]').forEach(btn=>btn.onclick=()=>{salvarJSON(fechadosKey(),[...new Set([...carregarJSON(fechadosKey(),[]),btn.dataset.fecharAviso])]);avisosAtivos=avisosAtivos.filter(v=>v.id!==btn.dataset.fecharAviso);btn.closest('.admpro-aviso').remove()})}
+    function avisosHTML(){
+      return avisosAtivos.map(a=>{
+        const nivel=a.automatico?(' prioridade-'+String(a.prioridade||'normal')):'';
+        const botao=(!a.automatico||a.permite_fechar)
+          ?'<button type="button" class="icon-button" data-fechar-aviso="'+U.escapar(a.id)+'" aria-label="Fechar aviso">×</button>':'';
+        return '<aside class="admpro-aviso '+(a.tipo==='alerta'?'alerta':'')+nivel+'" role="'+(a.prioridade==='critica'?'alert':'status')+'"><div><strong>'+U.escapar(a.titulo)+'</strong><p>'+U.escapar(a.mensagem)+'</p>'+(a.automatico?'<a class="aviso-assinatura-link" href="#/assinatura">Ver minha assinatura →</a>':'')+'</div>'+botao+'</aside>';
+      }).join('');
+    }
+    function bindAvisos(root){
+      root.querySelectorAll('[data-fechar-aviso]').forEach(btn=>btn.onclick=async()=>{
+        const a=avisosAtivos.find(v=>v.id===btn.dataset.fecharAviso);
+        if(!a)return;
+        btn.disabled=true;
+        try{
+          if(a.automatico){
+            const r=await A.auth.client.rpc('registrar_leitura_alerta',{p_entrega:a.entregaId,p_fechar:true});
+            if(r.error)throw r.error;
+          }else salvarJSON(fechadosKey(),[...new Set([...carregarJSON(fechadosKey(),[]),a.id])]);
+          avisosAtivos=avisosAtivos.filter(v=>v.id!==a.id);
+          btn.closest('.admpro-aviso')?.remove();
+        }catch(e){btn.disabled=false;A.ui?.toast?.('Não foi possível fechar o alerta: '+e.message)}
+      });
+      // Leitura contabilizada somente quando o aviso foi de fato exibido.
+      avisosAtivos.filter(a=>a.automatico&&!a.visualizado).forEach(a=>{
+        A.auth.client.rpc('registrar_leitura_alerta',{p_entrega:a.entregaId,p_fechar:false})
+          .then(r=>{if(!r.error)a.visualizado=true}).catch(()=>{});
+      });
+    }
     async function enviarFeedback(tipo,mensagem){
       if(!['duvida','problema','sugestao','pagamento'].includes(tipo))throw Error('Tipo inválido.');
       if(!contaAtual)throw Error('Faça login.');
