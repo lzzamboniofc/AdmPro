@@ -78,7 +78,7 @@ function render(){
     (ativo?'<span class="plano-assinatura-atual">'+(c.status_assinatura==='trial'?'Em teste':'Seu plano')+'</span>':'')+'</div>'+
     '<p class="plano-assinatura-preco">'+dinheiro(v.preco_mensal_centavos)+'<small>/mês</small></p>'+
     '<p>'+(v.limite_clientes??'Clientes ilimitados')+(v.limite_clientes!=null?' clientes':'')+
-    ' · '+(v.limite_servicos_mes??'Serviços ilimitados')+(v.limite_servicos_mes!=null?' serviços/mês':'')+'</p>'+
+    ' · '+(v.limite_servicos_mes??'Serviços ilimitados')+(v.limite_servicos_mes!=null?' serviços/mês':'')+' · '+(v.limite_usuarios==null?'Usuários ilimitados':v.limite_usuarios+' usuários com login')+'</p>'+
     botao+'</div>';
  }).join('');
  return '<div class="page-heading"><div><h1>Minha assinatura</h1><p class="muted">Escolha o plano e pague com Pix. A ativação é feita após a confirmação do recebimento.</p></div><a class="btn secundario" href="#/config">Voltar</a></div>'+
@@ -86,7 +86,7 @@ function render(){
  '<p><b>'+(c.status_assinatura==='trial'?'Valor após o teste':'Mensalidade contratada')+':</b> '+dinheiro(contratado)+'</p>'+
  (c.status_assinatura==='trial'?'<p>Seu período de teste termina em '+dias+' dia(s). Sem contratação, o acesso passa para o plano Grátis.</p>':'')+
  '<p><b>Próximo vencimento:</b> '+data(c.proximo_vencimento)+'</p>'+
- '<p><b>Limites:</b> '+(p.limite_clientes??'Ilimitados')+' clientes · '+(p.limite_servicos_mes??'Ilimitados')+' serviços/mês</p>','assinatura-resumo')+
+ '<p><b>Limites:</b> '+(p.limite_clientes??'Ilimitados')+' clientes · '+(p.limite_servicos_mes??'Ilimitados')+' serviços/mês · '+(p.limite_usuarios==null?'Usuários ilimitados':p.limite_usuarios+' usuários com login')+'</p>','assinatura-resumo')+
  pedidoHTML()+
  '<section class="section"><h2>Planos disponíveis</h2><div class="planos-assinatura-grade">'+cards+'</div>'+
  '<p class="muted">Ao escolher um plano pago, o valor será cobrado integralmente e o novo ciclo mensal começa na data do Pix confirmado. Não há cálculo proporcional nesta etapa.</p></section>'+
