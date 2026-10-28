@@ -1665,3 +1665,17 @@ body:has(#topbar[hidden]) .tela-seguranca .marca-vertical {
   .planos-assinatura-grade { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .plano-assinatura-card > button { align-self:stretch; }
 }
+
+/* Identidade do assinante no menu de perfil. */
+.avatar-button:has(.avatar-logo){
+  display:grid;place-items:center;overflow:hidden;padding:3px;
+  background:var(--superficie);border-color:var(--borda);
+}
+.avatar-logo{
+  display:block;width:100%;height:100%;max-width:100%;max-height:100%;
+  object-fit:contain;border-radius:50%;
+}
+@media(max-width:1023px){
+  /* A logo da empresa aparece no avatar, não duplicada junto ao nome. */
+  .topbar-identidade .topbar-nome > img.logo{display:none}
+}
